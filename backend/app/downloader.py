@@ -1,6 +1,9 @@
 """Download media from a URL with yt-dlp and convert it with FFmpeg."""
 
+import os
 import re
+import shutil
+import sys
 from pathlib import Path
 
 import yt_dlp
@@ -23,14 +26,40 @@ def _clean_error(exc: Exception) -> str:
     return message[:300] or "The download failed."
 
 
+# yt-dlp needs a JavaScript runtime to read YouTube. name -> executable.
+_JS_RUNTIME_BINARIES = (
+    ("deno", "deno"),
+    ("node", "node"),
+    ("bun", "bun"),
+    ("quickjs", "qjs"),
+)
+
+
+def js_runtimes() -> dict:
+    """Find installed JavaScript runtimes, including ones in the active venv."""
+    search_path = os.pathsep.join(
+        [str(Path(sys.executable).parent), os.environ.get("PATH", "")]
+    )
+    found = {}
+    for name, binary in _JS_RUNTIME_BINARIES:
+        path = shutil.which(binary, path=search_path)
+        if path:
+            found[name] = {"path": path}
+    return found
+
+
 def _base_options() -> dict:
-    return {
+    options = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
         "socket_timeout": 30,
         "windowsfilenames": True,
     }
+    runtimes = js_runtimes()
+    if runtimes:
+        options["js_runtimes"] = runtimes
+    return options
 
 
 def fetch_info(url: str) -> dict:

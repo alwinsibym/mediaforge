@@ -1,4 +1,6 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 python-multipart>=0.0.9
-yt-dlp>=2024.1.1
+yt-dlp[default]>=2025.11.12
+# JavaScript runtime that yt-dlp needs to read YouTube (Node.js 20+ also works).
+deno>=2.0; sys_platform != "linux" or platform_machine != "aarch64"
