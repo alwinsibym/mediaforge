@@ -156,7 +156,7 @@ mediaforge/
 
 ## Troubleshooting
 
-**"FFmpeg is not installed on the server" or `"ffmpeg": false` on the health page.** Install FFmpeg and open a new terminal so the updated `PATH` is picked up.
+**"FFmpeg was not found on this computer", a red banner on the page, or `"ffmpeg": false` on the health page.** Merging video and audio (for example MP4 at 1080p) and converting formats both need FFmpeg, and yt-dlp also needs its companion `ffprobe`. Install FFmpeg, open a **new** terminal (an already open one keeps the old `PATH`), run `ffmpeg -version` and `ffprobe -version` to confirm, then restart MediaForge.
 
 **YouTube downloads fail or report missing formats.** yt-dlp needs a JavaScript runtime. Check `js_runtimes` on the health page. If it is empty, install Deno (`pip install deno`) or Node.js 20+.
 
