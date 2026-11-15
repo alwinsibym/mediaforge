@@ -53,6 +53,16 @@ body {
 .subtitle { margin: 0 0 24px; color: var(--muted); }
 .muted { color: var(--muted); font-size: 0.875rem; margin: 0; }
 
+/* Setup warning */
+.banner {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
 /* Tabs */
 .tabs { display: flex; gap: 4px; margin-bottom: -1px; position: relative; z-index: 1; }
 .tab {

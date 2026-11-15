@@ -24,6 +24,7 @@ const els = {
   qualitySelect: $("quality-select"),
   submitBtn: $("submit-btn"),
   status: $("status"),
+  banner: $("banner"),
 };
 
 const state = { mode: "url", catalogue: null, busy: false };
@@ -277,6 +278,22 @@ async function onSubmit(event) {
   }
 }
 
+/* ---------- setup check ---------- */
+
+async function checkSetup() {
+  try {
+    const response = await fetch("/api/health");
+    const health = await response.json();
+    if (!health.ffmpeg) {
+      els.banner.textContent =
+        "FFmpeg was not found on this computer, so conversions will fail. " +
+        "Install it (Windows: winget install Gyan.FFmpeg), open a new terminal, " +
+        "and restart MediaForge.";
+      els.banner.hidden = false;
+    }
+  } catch (_) { /* loadFormats reports an unreachable server */ }
+}
+
 /* ---------- init ---------- */
 
 els.tabUrl.addEventListener("click", () => selectTab("url"));
@@ -286,3 +303,4 @@ els.previewBtn.addEventListener("click", previewUrl);
 els.form.addEventListener("submit", onSubmit);
 setupDropzone();
 loadFormats();
+checkSetup();
