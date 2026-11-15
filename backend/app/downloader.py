@@ -9,7 +9,7 @@ from pathlib import Path
 import yt_dlp
 from yt_dlp.utils import DownloadError
 
-from . import config, formats
+from . import config, ffmpeg_locator, formats
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -29,13 +29,15 @@ def _clean_error(exc: Exception) -> str:
 FFMPEG_HELP = (
     "FFmpeg was not found on this computer. It is needed to merge video and audio and to "
     "convert formats. Install it (Windows: winget install Gyan.FFmpeg), open a new terminal, "
-    'restart MediaForge, then check that /api/health shows "ffmpeg": true.'
+    "and restart MediaForge. If it is installed but still not found, set the "
+    "MEDIAFORGE_FFMPEG_DIR environment variable to the folder that contains ffmpeg.exe, "
+    'then check that /api/health shows "ffmpeg": true.'
 )
 
 
 def ffmpeg_ready() -> bool:
-    """yt-dlp needs both ffmpeg and ffprobe on the PATH."""
-    return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+    """True when ffmpeg can be found (on the PATH or in a known install folder)."""
+    return ffmpeg_locator.ready()
 
 
 # yt-dlp needs a JavaScript runtime to read YouTube. name -> executable.
@@ -69,6 +71,9 @@ def _base_options() -> dict:
     runtimes = js_runtimes()
     if runtimes:
         options["js_runtimes"] = runtimes
+    location = ffmpeg_locator.ytdlp_location()
+    if location:
+        options["ffmpeg_location"] = location
     return options
 
 

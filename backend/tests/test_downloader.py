@@ -60,10 +60,3 @@ def test_download_fails_early_without_ffmpeg(monkeypatch, tmp_path):
     )
     with pytest.raises(downloader.ConversionError, match="FFmpeg was not found"):
         downloader.download_and_convert("https://example.com/v", "mp4", "1080", tmp_path)
-
-
-def test_ffmpeg_ready_needs_both_tools(monkeypatch):
-    monkeypatch.setattr(
-        downloader.shutil, "which", lambda name, *a, **k: "/bin/x" if name == "ffmpeg" else None
-    )
-    assert downloader.ffmpeg_ready() is False

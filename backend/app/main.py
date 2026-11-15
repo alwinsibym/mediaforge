@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
 
-from . import __version__, config, downloader, formats, transcoder, validators
+from . import __version__, config, downloader, ffmpeg_locator, formats, transcoder, validators
 from .downloader import ConversionError
 
 app = FastAPI(title="MediaForge", version=__version__)
@@ -52,6 +52,7 @@ def health() -> dict:
         "status": "ok",
         "version": __version__,
         "ffmpeg": downloader.ffmpeg_ready(),
+        "ffmpeg_path": ffmpeg_locator.find_tool("ffmpeg"),
         "js_runtimes": sorted(downloader.js_runtimes()),
     }
 

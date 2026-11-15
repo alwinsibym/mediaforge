@@ -1,22 +1,22 @@
 """Convert local audio/video files with FFmpeg."""
 
-import shutil
 import subprocess
 from pathlib import Path
 
-from . import formats
+from . import ffmpeg_locator, formats
 from .downloader import FFMPEG_HELP, ConversionError
 
 FFMPEG_TIMEOUT_SECONDS = 1800
 
 
 def ffmpeg_available() -> bool:
-    return shutil.which("ffmpeg") is not None
+    return ffmpeg_locator.find_tool("ffmpeg") is not None
 
 
 def build_command(source: Path, target: Path, fmt: str, quality: str) -> list[str]:
     """Build the ffmpeg argument list for converting `source` into `fmt`."""
-    command = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(source)]
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(source)]
 
     if formats.is_audio(fmt):
         command += ["-vn", "-c:a", formats.AUDIO_FORMATS[fmt]["ffmpeg_codec"]]
