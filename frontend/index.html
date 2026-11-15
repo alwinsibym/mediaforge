@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MediaForge</title>
+  <meta name="description" content="Convert video URLs and local files to MP3, WAV, MP4 and more. Runs on your own machine.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>MediaForge</h1>
+      <p class="subtitle">Convert a video link or a local file to the audio or video format you need. Everything runs on your own machine.</p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Input source">
+      <button type="button" class="tab" role="tab" id="tab-url" aria-controls="panel-url" aria-selected="true">From URL</button>
+      <button type="button" class="tab" role="tab" id="tab-file" aria-controls="panel-file" aria-selected="false" tabindex="-1">From file</button>
+    </div>
+
+    <form id="convert-form" class="card" novalidate>
+      <section id="panel-url" class="panel" role="tabpanel" aria-labelledby="tab-url">
+        <label for="url-input" class="label">Video URL</label>
+        <div class="row">
+          <input id="url-input" name="url" type="url" inputmode="url" autocomplete="off"
+                 placeholder="https://www.youtube.com/watch?v=..." spellcheck="false">
+          <button type="button" id="preview-btn" class="btn btn-secondary">Preview</button>
+        </div>
+        <div id="preview" class="preview" hidden>
+          <img id="preview-thumb" alt="" width="120" height="68" hidden>
+          <div>
+            <p id="preview-title" class="preview-title"></p>
+            <p id="preview-meta" class="muted"></p>
+          </div>
+        </div>
+      </section>
+
+      <section id="panel-file" class="panel" role="tabpanel" aria-labelledby="tab-file" hidden>
+        <label for="file-input" class="label">Audio or video file</label>
+        <label id="dropzone" class="dropzone" for="file-input">
+          <input id="file-input" name="file" type="file" accept="audio/*,video/*">
+          <span id="dropzone-text">Choose a file or drag it here</span>
+          <span id="dropzone-hint" class="muted"></span>
+        </label>
+      </section>
+
+      <div class="options">
+        <div class="field">
+          <label for="format-select" class="label">Output format</label>
+          <select id="format-select" name="format"></select>
+        </div>
+        <div class="field" id="quality-field">
+          <label for="quality-select" class="label" id="quality-label">Quality</label>
+          <select id="quality-select" name="quality"></select>
+        </div>
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary">Convert and download</button>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </form>
+
+    <footer class="footer">
+      <p>For personal use with content you have the right to download. You are responsible for following the terms of the source site and applicable copyright law.</p>
+    </footer>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
