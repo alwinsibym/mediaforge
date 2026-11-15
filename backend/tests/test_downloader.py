@@ -43,5 +43,8 @@ def test_video_selector_caps_height():
 
 
 def test_error_cleaning_strips_noise():
-    raw = "\x1b[0;31mERROR:\x1b[0m [youtube] abc: Video unavailable; please report this issue on github"
+    raw = (
+        "\x1b[0;31mERROR:\x1b[0m [youtube] abc: Video unavailable; "
+        "please report this issue on github"
+    )
     assert downloader._clean_error(Exception(raw)) == "[youtube] abc: Video unavailable"

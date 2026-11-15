@@ -92,7 +92,7 @@ async def convert_url(body: ConvertRequest) -> FileResponse:
         raise _bad_request(exc) from exc
     except Exception:
         _cleanup(workdir)
-        raise HTTPException(status_code=500, detail="Unexpected server error.")
+        raise HTTPException(status_code=500, detail="Unexpected server error.") from None
     return _file_response(output, workdir)
 
 
@@ -131,7 +131,7 @@ async def convert_upload(
         raise _bad_request(exc) from exc
     except Exception:
         _cleanup(workdir)
-        raise HTTPException(status_code=500, detail="Unexpected server error.")
+        raise HTTPException(status_code=500, detail="Unexpected server error.") from None
     return _file_response(output, workdir)
 
 

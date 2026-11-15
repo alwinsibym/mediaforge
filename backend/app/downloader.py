@@ -37,9 +37,7 @@ _JS_RUNTIME_BINARIES = (
 
 def js_runtimes() -> dict:
     """Find installed JavaScript runtimes, including ones in the active venv."""
-    search_path = os.pathsep.join(
-        [str(Path(sys.executable).parent), os.environ.get("PATH", "")]
-    )
+    search_path = os.pathsep.join([str(Path(sys.executable).parent), os.environ.get("PATH", "")])
     found = {}
     for name, binary in _JS_RUNTIME_BINARIES:
         path = shutil.which(binary, path=search_path)
@@ -112,16 +110,13 @@ def _build_options(fmt: str, quality: str, workdir: Path) -> dict:
         options["format"] = _video_selector(fmt, quality)
         options["merge_output_format"] = fmt
         # Re-mux only when the downloaded container differs from the request.
-        options["postprocessors"] = [
-            {"key": "FFmpegVideoConvertor", "preferedformat": fmt}
-        ]
+        options["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": fmt}]
     return options
 
 
 def _find_output(workdir: Path, fmt: str) -> Path:
     files = [
-        p for p in workdir.iterdir()
-        if p.is_file() and p.suffix not in {".part", ".ytdl", ".tmp"}
+        p for p in workdir.iterdir() if p.is_file() and p.suffix not in {".part", ".ytdl", ".tmp"}
     ]
     if not files:
         raise ConversionError("Conversion finished but no file was produced.")

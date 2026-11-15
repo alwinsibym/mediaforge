@@ -23,7 +23,13 @@ def test_info_returns_metadata(client, monkeypatch):
     monkeypatch.setattr(
         main.downloader,
         "fetch_info",
-        lambda url: {"title": "Demo", "duration": 61, "uploader": "Me", "thumbnail": None, "is_live": False},
+        lambda url: {
+            "title": "Demo",
+            "duration": 61,
+            "uploader": "Me",
+            "thumbnail": None,
+            "is_live": False,
+        },
     )
     response = client.post("/api/info", json={"url": "https://example.com/v"})
     assert response.status_code == 200

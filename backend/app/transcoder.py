@@ -28,8 +28,16 @@ def build_command(source: Path, target: Path, fmt: str, quality: str) -> list[st
             command += ["-vf", f"scale=-2:'min(ih,{quality})'"]
         if fmt == "webm":
             command += [
-                "-c:v", "libvpx-vp9", "-crf", "32", "-b:v", "0", "-row-mt", "1",
-                "-c:a", "libopus",
+                "-c:v",
+                "libvpx-vp9",
+                "-crf",
+                "32",
+                "-b:v",
+                "0",
+                "-row-mt",
+                "1",
+                "-c:a",
+                "libopus",
             ]
         else:  # mp4, mkv
             command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac"]
