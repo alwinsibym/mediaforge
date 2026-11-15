@@ -149,3 +149,10 @@ def test_convert_file_reports_ffmpeg_failure(client):
     )
     assert response.status_code == 400
     assert "ffmpeg" in response.json()["detail"].lower()
+
+
+def test_convert_url_explains_missing_ffmpeg(client, monkeypatch):
+    monkeypatch.setattr(main.downloader.shutil, "which", lambda *args, **kwargs: None)
+    response = client.post("/api/convert", json={"url": "https://example.com/v", "format": "mp4"})
+    assert response.status_code == 400
+    assert "FFmpeg was not found" in response.json()["detail"]

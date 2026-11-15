@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app import downloader
 
 
@@ -48,3 +50,20 @@ def test_error_cleaning_strips_noise():
         "please report this issue on github"
     )
     assert downloader._clean_error(Exception(raw)) == "[youtube] abc: Video unavailable"
+
+
+def test_download_fails_early_without_ffmpeg(monkeypatch, tmp_path):
+    monkeypatch.setattr(downloader.shutil, "which", lambda *args, **kwargs: None)
+    # fetch_info must not be reached (no network needed to report the problem).
+    monkeypatch.setattr(
+        downloader, "fetch_info", lambda url: pytest.fail("should fail before any network call")
+    )
+    with pytest.raises(downloader.ConversionError, match="FFmpeg was not found"):
+        downloader.download_and_convert("https://example.com/v", "mp4", "1080", tmp_path)
+
+
+def test_ffmpeg_ready_needs_both_tools(monkeypatch):
+    monkeypatch.setattr(
+        downloader.shutil, "which", lambda name, *a, **k: "/bin/x" if name == "ffmpeg" else None
+    )
+    assert downloader.ffmpeg_ready() is False

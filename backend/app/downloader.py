@@ -26,6 +26,18 @@ def _clean_error(exc: Exception) -> str:
     return message[:300] or "The download failed."
 
 
+FFMPEG_HELP = (
+    "FFmpeg was not found on this computer. It is needed to merge video and audio and to "
+    "convert formats. Install it (Windows: winget install Gyan.FFmpeg), open a new terminal, "
+    'restart MediaForge, then check that /api/health shows "ffmpeg": true.'
+)
+
+
+def ffmpeg_ready() -> bool:
+    """yt-dlp needs both ffmpeg and ffprobe on the PATH."""
+    return shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+
+
 # yt-dlp needs a JavaScript runtime to read YouTube. name -> executable.
 _JS_RUNTIME_BINARIES = (
     ("deno", "deno"),
@@ -126,6 +138,9 @@ def _find_output(workdir: Path, fmt: str) -> Path:
 
 def download_and_convert(url: str, fmt: str, quality: str, workdir: Path) -> Path:
     """Download `url`, convert it to `fmt`, and return the output file path."""
+    if not ffmpeg_ready():
+        raise ConversionError(FFMPEG_HELP)
+
     info = fetch_info(url)
 
     if info["is_live"]:

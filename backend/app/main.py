@@ -51,7 +51,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "version": __version__,
-        "ffmpeg": transcoder.ffmpeg_available(),
+        "ffmpeg": downloader.ffmpeg_ready(),
         "js_runtimes": sorted(downloader.js_runtimes()),
     }
 

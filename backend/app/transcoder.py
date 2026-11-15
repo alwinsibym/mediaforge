@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 
 from . import formats
-from .downloader import ConversionError
+from .downloader import FFMPEG_HELP, ConversionError
 
 FFMPEG_TIMEOUT_SECONDS = 1800
 
@@ -51,7 +51,7 @@ def build_command(source: Path, target: Path, fmt: str, quality: str) -> list[st
 def convert_file(source: Path, fmt: str, quality: str, workdir: Path) -> Path:
     """Convert `source` and return the path of the converted file."""
     if not ffmpeg_available():
-        raise ConversionError("FFmpeg is not installed on the server.")
+        raise ConversionError(FFMPEG_HELP)
 
     target = workdir / f"{source.stem}.{fmt}"
     if target == source:
