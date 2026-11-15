@@ -117,6 +117,7 @@ Set these environment variables before starting the server (or in `docker-compos
 | `MEDIAFORGE_MAX_DURATION` | `3600` | Longest video accepted from a URL, in seconds |
 | `MEDIAFORGE_MAX_UPLOAD_MB` | `500` | Largest uploaded file, in megabytes |
 | `MEDIAFORGE_FRONTEND_DIR` | `../frontend` | Folder served as the web UI |
+| `MEDIAFORGE_FFMPEG_DIR` | (auto-detect) | Folder containing `ffmpeg`, for when it is installed but not on the `PATH` |
 
 ## Development
 
@@ -138,6 +139,7 @@ mediaforge/
 │   │   ├── main.py          # FastAPI app and endpoints
 │   │   ├── downloader.py    # yt-dlp download and conversion
 │   │   ├── transcoder.py    # FFmpeg conversion for uploaded files
+│   │   ├── ffmpeg_locator.py # finds FFmpeg even when the PATH is stale
 │   │   ├── formats.py       # supported formats and quality options
 │   │   ├── validators.py    # URL and filename validation
 │   │   └── config.py        # settings and limits
@@ -148,6 +150,7 @@ mediaforge/
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
+├── scripts/find-ffmpeg.ps1  # Windows helper: locate ffmpeg.exe
 ├── docs/screenshot.png
 ├── Dockerfile
 ├── docker-compose.yml
@@ -156,7 +159,7 @@ mediaforge/
 
 ## Troubleshooting
 
-**"FFmpeg was not found on this computer", a red banner on the page, or `"ffmpeg": false` on the health page.** Merging video and audio (for example MP4 at 1080p) and converting formats both need FFmpeg, and yt-dlp also needs its companion `ffprobe`. Install FFmpeg, open a **new** terminal (an already open one keeps the old `PATH`), run `ffmpeg -version` and `ffprobe -version` to confirm, then restart MediaForge.
+**"FFmpeg was not found on this computer", a red banner on the page, or `"ffmpeg": false` on the health page.** Merging video and audio (for example MP4 at 1080p) and converting formats need FFmpeg. MediaForge looks on the `PATH`, in the folder named by `MEDIAFORGE_FFMPEG_DIR`, and in the usual WinGet, Chocolatey and `C:\ffmpeg` locations. If it is installed but still not found, run `powershell -ExecutionPolicy Bypass -File scripts\find-ffmpeg.ps1` from the project folder. It finds `ffmpeg.exe` and prints the exact setting to use. Start MediaForge from the same terminal where you set it, or use `setx` and open a new terminal.
 
 **YouTube downloads fail or report missing formats.** yt-dlp needs a JavaScript runtime. Check `js_runtimes` on the health page. If it is empty, install Deno (`pip install deno`) or Node.js 20+.
 
