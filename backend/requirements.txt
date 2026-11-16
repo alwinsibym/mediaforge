@@ -2,5 +2,7 @@ fastapi>=0.110
 uvicorn[standard]>=0.29
 python-multipart>=0.0.9
 yt-dlp[default]>=2025.11.12
+# Needed to embed cover art in Ogg, Opus and FLAC files.
+mutagen>=1.47
 # JavaScript runtime that yt-dlp needs to read YouTube (Node.js 20+ also works).
 deno>=2.0; sys_platform != "linux" or platform_machine != "aarch64"

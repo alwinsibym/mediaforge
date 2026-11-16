@@ -1,5 +1,6 @@
 """Download media from a URL with yt-dlp and convert it with FFmpeg."""
 
+import importlib.util
 import os
 import re
 import shutil
@@ -7,6 +8,7 @@ import sys
 from pathlib import Path
 
 import yt_dlp
+from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 from yt_dlp.utils import DownloadError
 
 from . import config, ffmpeg_locator, formats
@@ -113,7 +115,56 @@ def _video_selector(fmt: str, height: str) -> str:
     return f"bestvideo{h}+bestaudio/best{h}"  # mkv
 
 
-def _build_options(fmt: str, quality: str, workdir: Path) -> dict:
+# Output formats that can carry a cover image. Ogg, Opus and FLAC need the mutagen package.
+_COVER_FORMATS = {"mp3", "m4a", "mp4", "mkv", "flac", "ogg", "opus"}
+_MUTAGEN_COVER_FORMATS = {"flac", "ogg", "opus"}
+
+
+def _can_embed_cover(fmt: str) -> bool:
+    if fmt not in _COVER_FORMATS:
+        return False
+    if fmt in _MUTAGEN_COVER_FORMATS:
+        return importlib.util.find_spec("mutagen") is not None
+    if fmt == "mkv":
+        # yt-dlp reads the cover's type with ffprobe when attaching it to MKV.
+        location = ffmpeg_locator.ytdlp_location()
+        return bool(location and shutil.which("ffprobe", path=location))
+    return True
+
+
+def _template_text(value: str) -> str:
+    """Make text safe to use as the default value inside a yt-dlp template."""
+    return re.sub(r"[()|%\r\n]", " ", value).strip()
+
+
+def _metadata_postprocessors(fmt: str, extra: dict | None) -> list[dict]:
+    """Postprocessors that write title, artist, album and cover art into the file.
+
+    `extra` can hold the playlist name ("album") and position ("track"). They are only
+    used when the site did not provide an album or track number of its own.
+    """
+    processors: list[dict] = []
+    actions = []
+    if extra and extra.get("album"):
+        template = f"%(album|{_template_text(extra['album'])})s"
+        actions.append((MetadataParserPP.interpretter, template, "%(album)s"))
+    if extra and extra.get("track"):
+        template = f"%(track_number|{int(extra['track'])})s"
+        actions.append((MetadataParserPP.interpretter, template, "%(track_number)s"))
+    if actions:
+        processors.append({"key": "MetadataParser", "when": "pre_process", "actions": actions})
+
+    processors.append({"key": "FFmpegMetadata", "add_metadata": True, "add_chapters": False})
+
+    if _can_embed_cover(fmt):
+        processors.append(
+            {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"}
+        )
+        processors.append({"key": "EmbedThumbnail", "already_have_thumbnail": False})
+    return processors
+
+
+def _build_options(fmt: str, quality: str, workdir: Path, extra: dict | None = None) -> dict:
     options = _base_options()
     options["outtmpl"] = str(workdir / "%(title).80s.%(ext)s")
 
@@ -126,15 +177,20 @@ def _build_options(fmt: str, quality: str, workdir: Path) -> dict:
         if fmt not in formats.LOSSLESS_AUDIO:
             postprocessor["preferredquality"] = quality
         options["postprocessors"] = [postprocessor]
+        options["postprocessors"] += _metadata_postprocessors(fmt, extra)
     else:
         options["format"] = _video_selector(fmt, quality)
         if formats.is_preset(fmt):
             # Download into MKV (holds any codec); FFmpeg re-encodes it afterwards.
             options["merge_output_format"] = "mkv"
+            options["postprocessors"] = _metadata_postprocessors(fmt, extra)
         else:
             options["merge_output_format"] = fmt
             # Re-mux only when the downloaded container differs from the request.
             options["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": fmt}]
+            options["postprocessors"] += _metadata_postprocessors(fmt, extra)
+    if any(pp["key"] == "EmbedThumbnail" for pp in options.get("postprocessors", [])):
+        options["writethumbnail"] = True
     return options
 
 
@@ -148,8 +204,13 @@ def _find_output(workdir: Path, extension: str) -> Path:
     return max(preferred or files, key=lambda p: p.stat().st_size)
 
 
-def download_and_convert(url: str, fmt: str, quality: str, workdir: Path) -> Path:
-    """Download `url`, convert it to `fmt`, and return the output file path."""
+def download_and_convert(
+    url: str, fmt: str, quality: str, workdir: Path, extra: dict | None = None
+) -> Path:
+    """Download `url`, convert it to `fmt`, and return the output file path.
+
+    `extra` may carry {"album": playlist name, "track": position} for playlist items.
+    """
     if not ffmpeg_ready():
         raise ConversionError(FFMPEG_HELP)
 
@@ -162,7 +223,7 @@ def download_and_convert(url: str, fmt: str, quality: str, workdir: Path) -> Pat
         limit_min = config.MAX_DURATION_SECONDS // 60
         raise ConversionError(f"This video is longer than the {limit_min}-minute limit.")
 
-    options = _build_options(fmt, quality, workdir)
+    options = _build_options(fmt, quality, workdir, extra)
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             ydl.download([url])

@@ -105,3 +105,48 @@ def test_preset_output_is_reencoded_for_the_car(monkeypatch, tmp_path):
     assert output.name == "Song.mp4"
     assert calls["convert"] == ("Song.mkv", "sony_mp4", "preset")
     assert not (tmp_path / "Song.mkv").exists()
+
+
+def _keys(options):
+    return [pp["key"] for pp in options.get("postprocessors", [])]
+
+
+def test_mp3_gets_metadata_and_cover_art():
+    options = downloader._build_options("mp3", "192", Path("/tmp/x"))
+    assert _keys(options) == [
+        "FFmpegExtractAudio",
+        "FFmpegMetadata",
+        "FFmpegThumbnailsConvertor",
+        "EmbedThumbnail",
+    ]
+    assert options["writethumbnail"] is True
+
+
+def test_formats_that_cannot_hold_a_cover_skip_it():
+    for fmt in ("wav", "aac"):
+        options = downloader._build_options(fmt, "192", Path("/tmp/x"))
+        assert "EmbedThumbnail" not in _keys(options)
+        assert "FFmpegMetadata" in _keys(options)
+        assert not options.get("writethumbnail")
+
+
+def test_video_keeps_metadata_but_presets_skip_the_cover():
+    assert "EmbedThumbnail" in _keys(downloader._build_options("mp4", "720", Path("/tmp/x")))
+    preset = downloader._build_options("sony_mp4", "preset", Path("/tmp/x"))
+    assert "EmbedThumbnail" not in _keys(preset)
+    assert "FFmpegMetadata" in _keys(preset)
+
+
+def test_ogg_family_needs_mutagen_for_covers(monkeypatch):
+    monkeypatch.setattr(downloader.importlib.util, "find_spec", lambda name: None)
+    assert not downloader._can_embed_cover("opus")
+    assert downloader._can_embed_cover("mp3")
+
+
+def test_playlist_name_and_position_become_album_and_track():
+    extra = {"album": "Road (Trip) | 2026 %", "track": 4}
+    options = downloader._build_options("mp3", "192", Path("/tmp/x"), extra)
+    parser = next(pp for pp in options["postprocessors"] if pp["key"] == "MetadataParser")
+    templates = [action[1] for action in parser["actions"]]
+    assert templates == ["%(album|Road  Trip    2026)s", "%(track_number|4)s"]
+    assert [action[2] for action in parser["actions"]] == ["%(album)s", "%(track_number)s"]
