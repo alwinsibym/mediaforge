@@ -17,6 +17,10 @@ It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), 
 - Car presets for the Sony XAV-W650BT and similar older head units (see below).
 - Configurable limits for video length and upload size.
 - Temporary files are deleted after each download.
+- Pasting a link shows the thumbnail, title, channel, length, views and date, and lists only the video qualities that video really has (4K, 1440p60, 1080p and so on). Nothing is upscaled.
+- Download the thumbnail in any size the site offers, as JPG, PNG or WebP, optionally cropped to a square.
+- Video without sound (any quality), and square cover art that car units and Windows can show on MP3 and M4A files.
+- Works on phones and tablets too: see "Using it from other devices".
 - Light and dark theme, responsive layout.
 
 ## How it works
@@ -80,11 +84,13 @@ Open <http://localhost:8000>.
    pip install -r requirements.txt
    ```
 
-3. Start the server from the `backend` folder.
+3. Start the server. From the project folder this works on every system:
 
    ```bash
-   uvicorn app.main:app --reload
+   python run.py
    ```
+
+   (Developers can also run `uvicorn app.main:app --reload` from the `backend` folder.)
 
 4. Open <http://localhost:8000>.
 
@@ -105,6 +111,30 @@ Paste a playlist link on the **Playlist** tab and select **Load playlist**. Unti
 - **Make a ZIP to download** builds a ZIP you can download when the job finishes.
 - Both can be on at the same time.
 
+### Video quality, 4K and 8K
+
+When you paste a link, the Quality menu lists what that video offers, for example `2160p60 (4K)`, `1440p30 (2K)` and `1080p`, with an estimated size. A video that only has 720p will only list 720p. Above 1080p, YouTube provides VP9 or AV1 video instead of H.264, so **MKV or WebM** plays these most reliably. MP4 works too, but may not play on older devices. On the File and Playlist tabs the menu is a maximum ("Up to 1440p"), and each video is downloaded at the best quality it has up to that limit.
+
+### Thumbnails, covers and sound
+
+- **Download thumbnail** (under the video preview) saves the thumbnail in any size the site lists, as JPG, PNG or WebP, optionally cropped to a square.
+- **MP3 and M4A** files get a square cover and the title, artist and album. If a cover cannot be added, the page says so after the download.
+- **Remove the sound** (video formats) gives a silent video at the quality you picked.
+
+### Using it from other devices
+
+MediaForge runs on one computer, and any device with a browser can use it:
+
+| Device | How |
+| --- | --- |
+| Windows, macOS, Linux | Install the requirements and run `python run.py`. |
+| Android phone or tablet | Open it from the computer (below), or run it on the phone itself with [Termux](https://termux.dev/): `pkg install python ffmpeg`, then `pip install -r backend/requirements.txt` and `python run.py`. |
+| iPhone and iPad | Open it from the computer (below). iOS cannot run the server itself. |
+
+To use a phone or tablet with your computer, start the server with `python run.py --lan` and open the address it prints (for example `http://192.168.1.20:8000`) on a device on the same Wi-Fi. In your browser's menu, **Add to Home screen** (or **Install app**) puts it on the home screen like an app. Converted files download to the phone. A playlist's "save to a folder" option saves on the computer running MediaForge, and the Open folder button only works there.
+
+`--lan` lets anyone on the network use MediaForge, and it has no sign-in. Use it on a network you trust, and never expose it to the internet.
+
 ### Older car head units (Sony XAV-W650BT)
 
 This Sony unit cannot play the H.264 video that normal MP4 files use. According to Sony's manual it plays only:
@@ -114,7 +144,7 @@ This Sony unit cannot play the H.264 video that normal MP4 files use. According 
 | MP4 | MPEG-4 Simple Profile | AAC | 4 Mbps, 720 x 576, 30 fps |
 | AVI | Xvid (MPEG-4 ASP) | MP3 | 8 Mbps, 720 x 576, 30 fps |
 
-Choose **Video**, then **Sony car MP4** (about 3.3 Mbps video and 192 kbps AAC audio) or **Sony car AVI** (about 6.5 Mbps video and 192 kbps MP3 audio). Try the MP4 first and use the AVI if it will not play. Format the USB stick as FAT32. For music only, use MP3 at 192 kbps or lower, because Sony lists 48 to 192 kbps for MP3. These presets were checked with FFmpeg, not on a real head unit, and Sony says playback is not guaranteed.
+Choose **Video**, then **Sony car MP4** (about 3.3 Mbps video and 192 kbps AAC audio) or **Sony car AVI** (about 6.5 Mbps video and 192 kbps MP3 audio). Try the MP4 first and use the AVI if it will not play. Format the USB stick as FAT32. For music only, use MP3 at 192 kbps or lower, because Sony lists 48 to 192 kbps for MP3. The files are stereo. The unit's Dolby Digital decoding is for DVD discs, and its four speakers are fed from the stereo signal, so use the unit's own sound settings (EQ and fader) to shape it. These presets were checked with FFmpeg, not on a real head unit, and Sony says playback is not guaranteed.
 
 ## API
 
@@ -122,8 +152,9 @@ Choose **Video**, then **Sony car MP4** (about 3.3 Mbps video and 192 kbps AAC a
 | --- | --- | --- |
 | GET | `/api/health` | Server status, FFmpeg availability, detected JavaScript runtimes |
 | GET | `/api/formats` | Supported formats, quality options and limits |
-| POST | `/api/info` | Body `{"url": "..."}`. Returns title, duration, uploader, thumbnail |
-| POST | `/api/convert` | Body `{"url": "...", "format": "mp3", "quality": "192"}`. Returns the converted file |
+| POST | `/api/info` | Body `{"url": "..."}`. Returns title, duration, uploader, views, date, thumbnails, and the available video qualities |
+| POST | `/api/thumbnail` | Body `{"url": "...", "id": "...", "format": "jpg", "square": false}`. Returns the thumbnail image |
+| POST | `/api/convert` | Body `{"url": "...", "format": "mp3", "quality": "192", "mute": false}`. Video quality can be `best`, a height such as `2160`, or a height and frame-rate cap such as `1440@30`. Returns the converted file |
 | POST | `/api/playlist/info` | Body `{"url": "..."}`. Lists the videos in a playlist |
 | POST | `/api/jobs` | Starts a playlist job: `title`, `items` (`title`, `url`), `format`, `quality`, `save_to_folder`, `make_zip` |
 | GET | `/api/jobs/{id}` | Progress of a job, with the state of each video |
@@ -170,6 +201,7 @@ mediaforge/
 │   │   ├── downloader.py    # yt-dlp download and conversion
 │   │   ├── transcoder.py    # FFmpeg conversion for uploaded files and the car presets
 │   │   ├── jobs.py          # background playlist jobs
+│   │   ├── cover.py         # square cover art for MP3 and M4A
 │   │   ├── ffmpeg_locator.py # finds FFmpeg even when the PATH is stale
 │   │   ├── formats.py       # supported formats and quality options
 │   │   ├── validators.py    # URL and filename validation
@@ -181,8 +213,11 @@ mediaforge/
 │   ├── index.html
 │   ├── style.css
 │   ├── app.js
+│   ├── manifest.webmanifest # lets phones add it to the home screen
+│   ├── icons/
 │   ├── favicon.svg
 │   └── fonts/           # Archivo variable font (SIL OFL)
+├── run.py                   # starts the server (--lan for other devices)
 ├── scripts/find-ffmpeg.ps1  # Windows helper: locate ffmpeg.exe
 ├── docs/screenshot.png
 ├── Dockerfile
