@@ -691,7 +691,9 @@ async function onSubmit(event) {
     const blob = await response.blob();
     const name = filenameFrom(response, `converted.${state.format}`);
     saveBlob(blob, name);
-    setStatus(`Done: ${name} (${formatSize(blob.size)})`, "success");
+    const note = response.headers.get("x-mediaforge-note");
+    const extra = note ? ` ${decodeURIComponent(note)}` : "";
+    setStatus(`Done: ${name} (${formatSize(blob.size)}).${extra}`, "success");
   } catch (error) {
     setStatus(error.message || "Something went wrong.", "error");
   } finally {

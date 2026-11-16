@@ -117,8 +117,8 @@ def test_mp3_gets_metadata_and_cover_art():
         "FFmpegExtractAudio",
         "FFmpegMetadata",
         "FFmpegThumbnailsConvertor",
-        "EmbedThumbnail",
     ]
+    # The cover itself is added afterwards by app.cover (see test_cover.py).
     assert options["writethumbnail"] is True
 
 

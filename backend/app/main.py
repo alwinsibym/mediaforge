@@ -3,6 +3,7 @@
 import shutil
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -110,8 +111,9 @@ async def convert_url(body: ConvertRequest) -> FileResponse:
     try:
         url = validators.validate_url(body.url)
         fmt, quality = formats.normalize(body.format, body.quality)
+        notes: list[str] = []
         output = await run_in_threadpool(
-            downloader.download_and_convert, url, fmt, quality, Path(workdir)
+            downloader.download_and_convert, url, fmt, quality, Path(workdir), None, notes
         )
     except (ValueError, ConversionError) as exc:
         _cleanup(workdir)
@@ -119,7 +121,10 @@ async def convert_url(body: ConvertRequest) -> FileResponse:
     except Exception:
         _cleanup(workdir)
         raise HTTPException(status_code=500, detail="Unexpected server error.") from None
-    return _file_response(output, workdir)
+    response = _file_response(output, workdir)
+    if notes:
+        response.headers["X-MediaForge-Note"] = quote(" ".join(notes))
+    return response
 
 
 async def _save_upload(upload: UploadFile, destination: Path) -> None:

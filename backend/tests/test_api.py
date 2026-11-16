@@ -46,7 +46,7 @@ def test_info_rejects_bad_url(client):
 def test_convert_url_streams_file_and_cleans_up(client, monkeypatch):
     workdirs = []
 
-    def fake_download(url, fmt, quality, workdir):
+    def fake_download(url, fmt, quality, workdir, extra=None, notes=None):
         workdirs.append(workdir)
         output = workdir / f"Demo.{fmt}"
         output.write_bytes(b"fake-audio")
@@ -64,7 +64,7 @@ def test_convert_url_streams_file_and_cleans_up(client, monkeypatch):
 def test_convert_url_reports_downloader_errors(client, monkeypatch):
     workdirs = []
 
-    def failing_download(url, fmt, quality, workdir):
+    def failing_download(url, fmt, quality, workdir, extra=None, notes=None):
         workdirs.append(workdir)
         raise ConversionError("This video is longer than the 60-minute limit.")
 

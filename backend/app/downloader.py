@@ -11,7 +11,7 @@ import yt_dlp
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 from yt_dlp.utils import DownloadError
 
-from . import config, ffmpeg_locator, formats
+from . import config, cover, ffmpeg_locator, formats
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -205,7 +205,10 @@ def _metadata_postprocessors(fmt: str, extra: dict | None) -> list[dict]:
         processors.append(
             {"key": "FFmpegThumbnailsConvertor", "format": "jpg", "when": "before_dl"}
         )
-        processors.append({"key": "EmbedThumbnail", "already_have_thumbnail": False})
+        # MP3 and M4A covers are added afterwards by app.cover, which writes square art in
+        # the ID3 version that car head units and Windows read.
+        if fmt not in cover.COVER_FORMATS:
+            processors.append({"key": "EmbedThumbnail", "already_have_thumbnail": False})
     return processors
 
 
@@ -234,7 +237,10 @@ def _build_options(fmt: str, quality: str, workdir: Path, extra: dict | None = N
             # Re-mux only when the downloaded container differs from the request.
             options["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": fmt}]
             options["postprocessors"] += _metadata_postprocessors(fmt, extra)
-    if any(pp["key"] == "EmbedThumbnail" for pp in options.get("postprocessors", [])):
+    if any(
+        pp["key"] in ("EmbedThumbnail", "FFmpegThumbnailsConvertor")
+        for pp in options.get("postprocessors", [])
+    ):
         options["writethumbnail"] = True
     return options
 
@@ -249,12 +255,34 @@ def _find_output(workdir: Path, extension: str) -> Path:
     return max(preferred or files, key=lambda p: p.stat().st_size)
 
 
+def _add_cover(output: Path, workdir: Path, notes: list[str] | None) -> None:
+    """Embed the downloaded thumbnail in an MP3 or M4A file, and report any problem."""
+    image = cover.find_image(workdir)
+    try:
+        if image is None:
+            raise cover.CoverError("the site did not provide a thumbnail")
+        cover.embed_cover(output, image)
+    except cover.CoverError as exc:
+        if notes is not None:
+            notes.append(f"Cover art could not be added: {exc}.")
+    finally:
+        for leftover in workdir.iterdir():
+            if leftover != output and leftover.suffix.lower() in cover.IMAGE_SUFFIXES:
+                leftover.unlink(missing_ok=True)
+
+
 def download_and_convert(
-    url: str, fmt: str, quality: str, workdir: Path, extra: dict | None = None
+    url: str,
+    fmt: str,
+    quality: str,
+    workdir: Path,
+    extra: dict | None = None,
+    notes: list[str] | None = None,
 ) -> Path:
     """Download `url`, convert it to `fmt`, and return the output file path.
 
     `extra` may carry {"album": playlist name, "track": position} for playlist items.
+    Problems that do not stop the download (such as missing cover art) are added to `notes`.
     """
     if not ffmpeg_ready():
         raise ConversionError(FFMPEG_HELP)
@@ -283,4 +311,7 @@ def download_and_convert(
         downloaded.unlink(missing_ok=True)
         return output
 
-    return _find_output(workdir, fmt)
+    output = _find_output(workdir, fmt)
+    if fmt in cover.COVER_FORMATS:
+        _add_cover(output, workdir, notes)
+    return output
