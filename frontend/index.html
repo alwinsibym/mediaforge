@@ -59,10 +59,27 @@
             <button type="button" id="preview-btn" class="btn btn-quiet">Preview</button>
           </div>
           <div id="preview" class="preview" hidden>
-            <img id="preview-thumb" alt="" width="128" height="72" hidden>
+            <img id="preview-thumb" alt="" width="176" height="99" hidden>
             <div class="preview-text">
               <p id="preview-title" class="preview-title"></p>
               <p id="preview-meta" class="preview-meta"></p>
+              <p id="preview-quality" class="preview-meta"></p>
+              <details id="thumb-tools" class="thumb-tools" hidden>
+                <summary>Download thumbnail</summary>
+                <div class="thumb-row">
+                  <div class="mini-field"><label for="thumb-size">Size</label><select id="thumb-size"></select></div>
+                  <div class="mini-field">
+                    <label for="thumb-format">Format</label>
+                    <select id="thumb-format">
+                      <option value="jpg">JPG</option>
+                      <option value="png">PNG</option>
+                      <option value="webp">WebP</option>
+                    </select>
+                  </div>
+                  <label class="check"><input type="checkbox" id="thumb-square"><span>Square crop</span></label>
+                  <button type="button" id="thumb-download" class="btn btn-quiet">Download</button>
+                </div>
+              </details>
             </div>
           </div>
         </section>
@@ -119,6 +136,10 @@
             <label for="quality-select" class="field-label" id="quality-label">Bitrate</label>
             <select id="quality-select" name="quality"></select>
           </div>
+
+          <label class="check group-mute" id="mute-field" hidden>
+            <input type="checkbox" id="opt-mute"><span>Remove the sound (video only)</span>
+          </label>
         </div>
 
         <dl class="spec" aria-label="Output details">

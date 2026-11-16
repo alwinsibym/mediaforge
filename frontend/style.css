@@ -272,7 +272,8 @@ a { color: var(--accent); }
   border: 1px solid var(--line);
   border-radius: 14px;
 }
-.preview img { flex: none; width: 128px; height: 72px; border-radius: 8px; object-fit: cover; }
+.preview { align-items: flex-start; }
+.preview img { flex: none; width: 176px; height: 99px; border-radius: 8px; object-fit: cover; }
 .preview-text { min-width: 0; }
 .preview-title { font-family: var(--font-display); font-weight: 650; overflow-wrap: anywhere; }
 .preview-meta { margin-top: 2px; color: var(--muted); font-size: 0.9rem; }
@@ -321,6 +322,8 @@ a { color: var(--accent); }
 .group-formats { grid-column: 2; grid-row: 1; }
 .group-quality { grid-column: 1 / -1; grid-row: 2; max-width: 280px; }
 .group-quality[hidden] { display: none; }
+.group-mute { grid-column: 1 / -1; grid-row: 3; }
+.group-mute[hidden] { display: none; }
 
 .field-label {
   display: block;
@@ -491,8 +494,9 @@ td:nth-child(2) { color: var(--muted); white-space: nowrap; }
 
 /* FAQ */
 .faq { margin-top: 20px; border-top: 1px solid var(--line-strong); }
-details { border-bottom: 1px solid var(--line); }
-summary {
+/* The question list. Scoped so other details elements keep their default look. */
+.faq details { border-bottom: 1px solid var(--line); }
+.faq summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -503,7 +507,7 @@ summary {
   list-style: none;
 }
 summary::-webkit-details-marker { display: none; }
-summary::after {
+.faq summary::after {
   content: "+";
   flex: none;
   color: var(--accent);
@@ -511,8 +515,8 @@ summary::after {
   line-height: 1;
   transition: transform 0.15s;
 }
-details[open] summary::after { transform: rotate(45deg); }
-details p { max-width: 64ch; padding: 0 2px 20px; color: var(--muted); }
+.faq details[open] summary::after { transform: rotate(45deg); }
+.faq details p { max-width: 64ch; padding: 0 2px 20px; color: var(--muted); }
 
 /* Footer */
 .site-footer { border-top: 1px solid var(--line); background: var(--surface); }
@@ -537,14 +541,15 @@ details p { max-width: 64ch; padding: 0 2px 20px; color: var(--muted); }
   .group-quality { grid-row: auto; max-width: none; }
   .input-bar { height: 56px; }
   .preview { align-items: flex-start; }
-  .preview img { width: 96px; height: 54px; }
+  .preview { flex-direction: column; }
+  .preview img { width: 100%; height: auto; aspect-ratio: 16 / 9; }
   th, td { padding: 11px 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .wave span { animation: none; transform: scaleY(0.7); }
-  .chip span, summary::after { transition: none; }
+  .chip span, .faq summary::after { transition: none; }
 }
 
 .format-note {
@@ -603,3 +608,14 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 @media (max-width: 560px) {
   .source-tab { padding: 8px 16px; }
 }
+
+/* Thumbnail download */
+.thumb-tools { margin-top: 10px; }
+.thumb-tools summary { color: var(--accent); font-weight: 650; cursor: pointer; }
+.thumb-tools[open] summary { margin-bottom: 4px; }
+.thumb-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 14px; margin-top: 10px; }
+.mini-field label { display: block; margin-bottom: 4px; color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.mini-field select { min-width: 150px; }
+.thumb-row .check { padding-bottom: 10px; }
+.thumb-row .btn { padding: 9px 16px; }
+.preview-text { flex: 1; }

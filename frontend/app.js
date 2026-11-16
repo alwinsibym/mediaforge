@@ -35,6 +35,14 @@ const els = {
   previewThumb: $("preview-thumb"),
   previewTitle: $("preview-title"),
   previewMeta: $("preview-meta"),
+  previewQuality: $("preview-quality"),
+  thumbTools: $("thumb-tools"),
+  thumbSize: $("thumb-size"),
+  thumbFormat: $("thumb-format"),
+  thumbSquare: $("thumb-square"),
+  thumbDownload: $("thumb-download"),
+  muteField: $("mute-field"),
+  optMute: $("opt-mute"),
   fileInput: $("file-input"),
   dropzone: $("dropzone"),
   dropzoneText: $("dropzone-text"),
@@ -67,6 +75,9 @@ const state = {
   playlist: null,
   jobId: null,
   poller: null,
+  info: null,
+  previewedUrl: "",
+  previewTimer: null,
 };
 
 const TABS = {
@@ -84,7 +95,7 @@ const FORMAT_INFO = {
   flac: { label: "FLAC", container: "FLAC", codec: "FLAC, lossless" },
   ogg: { label: "OGG", container: "OGG", codec: "Vorbis" },
   opus: { label: "Opus", container: "Opus", codec: "Opus" },
-  mp4: { label: "MP4", container: "MP4", codec: "Usually H.264 and AAC" },
+  mp4: { label: "MP4", container: "MP4", codec: "H.264 up to 1080p, VP9 above" },
   webm: { label: "WebM", container: "WebM", codec: "Usually VP9 and Opus" },
   mkv: { label: "MKV", container: "MKV", codec: "Usually H.264 and AAC" },
   sony_mp4: {
@@ -111,7 +122,22 @@ const VIDEO_SIZE_PER_MINUTE = {
   480: "6 to 9 MB",
   720: "15 to 25 MB",
   1080: "30 to 50 MB",
+  1440: "50 to 90 MB",
+  2160: "100 to 200 MB",
+  4320: "400 MB or more",
 };
+
+const RESOLUTION_NAMES = { 1440: "2K", 2160: "4K", 4320: "8K" };
+
+function heightOf(quality) {
+  return Number.parseInt(quality, 10) || 0;
+}
+
+function staticQualityLabel(value) {
+  if (value === "best") return "Best available";
+  const name = RESOLUTION_NAMES[value];
+  return name ? `Up to ${value}p (${name})` : `Up to ${value}p`;
+}
 
 /* ---------- helpers ---------- */
 
@@ -247,17 +273,35 @@ function renderQualityOptions() {
   const c = state.catalogue;
   const isAudio = state.kind === "audio";
 
+  const previous = els.qualitySelect.value;
+  const found = !isAudio && state.mode === "url" && state.info && state.info.qualities;
   els.qualityField.hidden = isLossless() || isPreset();
   els.qualitySelect.replaceChildren();
-  els.qualityLabel.textContent = isAudio ? "Bitrate" : "Maximum resolution";
+  els.qualityLabel.textContent = isAudio ? "Bitrate" : found?.length ? "Quality" : "Maximum resolution";
 
-  for (const value of isAudio ? c.audio_bitrates : c.video_heights) {
+  const addOption = (value, text) => {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = isAudio ? `${value} kbps` : value === "best" ? "Best available" : `${value}p`;
+    option.textContent = text;
     els.qualitySelect.appendChild(option);
+  };
+
+  if (isAudio) {
+    for (const value of c.audio_bitrates) addOption(value, `${value} kbps`);
+    els.qualitySelect.value = c.defaults.audio_bitrate;
+  } else if (found?.length) {
+    // Only what this video really offers, so nothing is upscaled.
+    for (const q of found) {
+      addOption(q.id, q.size ? `${q.label} (about ${formatSize(q.size)})` : q.label);
+    }
+    els.qualitySelect.value = found.some((q) => q.id === previous) ? previous : found[0].id;
+  } else {
+    const heights = [...c.video_heights].sort((a, b) => heightOf(b) - heightOf(a));
+    for (const value of heights) addOption(value, staticQualityLabel(value));
+    const keep = heights.includes(previous) ? previous : c.defaults.video_height;
+    els.qualitySelect.value = keep;
   }
-  els.qualitySelect.value = isAudio ? c.defaults.audio_bitrate : c.defaults.video_height;
+  els.muteField.hidden = isAudio;
 }
 
 function renderSpec() {
@@ -277,20 +321,41 @@ function renderSpec() {
       qualityText = `${quality} kbps`;
       sizeText = `About ${((Number(quality) * 60) / 8 / 1000).toFixed(1)} MB per minute`;
     }
+  } else if (state.mode === "url" && state.info?.qualities?.some((q) => q.id === quality)) {
+    const chosen = state.info.qualities.find((q) => q.id === quality);
+    qualityText = chosen.label;
+    sizeText = chosen.size ? `About ${formatSize(chosen.size)} in total` : "Depends on the video";
   } else if (quality === "best") {
     qualityText = "Best available";
     sizeText = "Depends on the video";
   } else {
-    qualityText = `Up to ${quality}p`;
-    sizeText = `About ${VIDEO_SIZE_PER_MINUTE[quality]} per minute`;
+    const height = heightOf(quality);
+    qualityText = `Up to ${height}p`;
+    sizeText = VIDEO_SIZE_PER_MINUTE[height]
+      ? `About ${VIDEO_SIZE_PER_MINUTE[height]} per minute`
+      : "Depends on the video";
   }
 
   els.specContainer.textContent = info.container;
-  els.specCodec.textContent = info.codec;
+  const muted = isMuted() && !isPreset();
+  els.specCodec.textContent = muted ? `${info.codec} (no sound)` : info.codec;
   els.specQuality.textContent = qualityText;
   els.specSize.textContent = sizeText;
-  els.formatNote.textContent = info.note || "";
-  els.formatNote.hidden = !info.note;
+  const note = info.note || highResolutionNote();
+  els.formatNote.textContent = note;
+  els.formatNote.hidden = !note;
+}
+
+function isMuted() {
+  return state.kind === "video" && els.optMute.checked;
+}
+
+function highResolutionNote() {
+  if (state.kind !== "video" || isPreset() || els.qualityField.hidden) return "";
+  const quality = els.qualitySelect.value;
+  const height = quality === "best" ? 9999 : heightOf(quality);
+  if (height <= 1080 || state.format === "webm") return "";
+  return "Above 1080p, YouTube offers VP9 and AV1 video instead of H.264. MKV or WebM plays these most reliably, and MP4 may not play on older devices.";
 }
 
 function selectKind(kind) {
@@ -327,6 +392,10 @@ function selectTab(mode) {
   }
   els.submitBtn.textContent = submitLabel();
   els.submitBtn.disabled = mode === "playlist" && selectedEntries().length === 0;
+  if (state.catalogue) {
+    renderQualityOptions();
+    renderSpec();
+  }
   setStatus("");
 }
 
@@ -345,20 +414,84 @@ function updateClearButton() {
   els.clearBtn.hidden = !els.urlInput.value;
 }
 
+function resetPreview() {
+  clearTimeout(state.previewTimer);
+  state.info = null;
+  state.previewedUrl = "";
+  els.preview.hidden = true;
+  els.thumbTools.hidden = true;
+  if (state.catalogue) {
+    renderQualityOptions();
+    renderSpec();
+  }
+}
+
 function clearUrl() {
   els.urlInput.value = "";
-  els.preview.hidden = true;
+  resetPreview();
   updateClearButton();
   els.urlInput.focus();
 }
 
-async function previewUrl() {
+function looksLikeUrl(text) {
+  return /^https?:\/\/\S+\.\S+/i.test(text);
+}
+
+function formatCount(number) {
+  return new Intl.NumberFormat(undefined, { notation: "compact" }).format(number);
+}
+
+function formatUploadDate(text) {
+  if (!text || text.length !== 8) return "";
+  const date = new Date(Number(text.slice(0, 4)), Number(text.slice(4, 6)) - 1, Number(text.slice(6, 8)));
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function showPreview(info) {
+  state.info = info;
+  els.previewTitle.textContent = info.title;
+  els.previewMeta.textContent = [
+    info.uploader,
+    formatDuration(info.duration),
+    info.view_count ? `${formatCount(info.view_count)} views` : "",
+    formatUploadDate(info.upload_date),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const top = info.qualities[0];
+  els.previewQuality.textContent = top
+    ? `Available up to ${top.label}${info.qualities.length > 1 ? `, ${info.qualities.length} video qualities` : ""}`
+    : "No video qualities listed. Audio formats still work.";
+
+  if (info.thumbnail) {
+    els.previewThumb.src = info.thumbnail;
+    els.previewThumb.hidden = false;
+  } else {
+    els.previewThumb.hidden = true;
+  }
+
+  els.thumbSize.replaceChildren();
+  for (const size of info.thumbnails) {
+    const option = document.createElement("option");
+    option.value = size.id;
+    option.textContent = size.label;
+    els.thumbSize.appendChild(option);
+  }
+  els.thumbTools.hidden = info.thumbnails.length === 0;
+  els.preview.hidden = false;
+  renderQualityOptions();
+  renderSpec();
+}
+
+async function previewUrl({ quiet = false } = {}) {
   const url = els.urlInput.value.trim();
   if (!url) {
-    setStatus("Paste a video link first.", "error");
+    if (!quiet) setStatus("Paste a video link first.", "error");
     els.urlInput.focus();
     return;
   }
+  if (url === state.previewedUrl && state.info) return;
   setBusy(true);
   setStatus("Looking up the video...");
   try {
@@ -369,24 +502,62 @@ async function previewUrl() {
     });
     if (!response.ok) throw new Error(await errorMessage(response));
     const info = await response.json();
-
-    els.previewTitle.textContent = info.title;
-    els.previewMeta.textContent = [info.uploader, formatDuration(info.duration)]
-      .filter(Boolean)
-      .join(", ");
-    if (info.thumbnail) {
-      els.previewThumb.src = info.thumbnail;
-      els.previewThumb.hidden = false;
-    } else {
-      els.previewThumb.hidden = true;
-    }
-    els.preview.hidden = false;
+    if (els.urlInput.value.trim() !== url) return; // the link changed while we waited
+    state.previewedUrl = url;
+    showPreview(info);
     setStatus("");
   } catch (error) {
-    els.preview.hidden = true;
-    setStatus(error.message, "error");
+    if (els.urlInput.value.trim() === url) {
+      resetPreview();
+      setStatus(error.message, "error");
+    }
   } finally {
     setBusy(false);
+  }
+}
+
+/* Look up the link by itself once it has been pasted or typed. */
+function onUrlInput() {
+  updateClearButton();
+  clearTimeout(state.previewTimer);
+  const url = els.urlInput.value.trim();
+  if (url !== state.previewedUrl) {
+    state.info = null;
+    els.preview.hidden = true;
+    if (state.catalogue) {
+      renderQualityOptions();
+      renderSpec();
+    }
+  }
+  if (looksLikeUrl(url) && !state.busy) {
+    state.previewTimer = setTimeout(() => previewUrl({ quiet: true }), 700);
+  }
+}
+
+async function downloadThumbnail() {
+  const url = state.previewedUrl;
+  if (!url || !els.thumbSize.value) return;
+  els.thumbDownload.disabled = true;
+  try {
+    const response = await fetch("/api/thumbnail", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        id: els.thumbSize.value,
+        format: els.thumbFormat.value,
+        square: els.thumbSquare.checked,
+      }),
+    });
+    if (!response.ok) throw new Error(await errorMessage(response));
+    const blob = await response.blob();
+    const name = filenameFrom(response, `thumbnail.${els.thumbFormat.value}`);
+    saveBlob(blob, name);
+    setStatus(`Saved ${name} (${formatSize(blob.size)})`, "success");
+  } catch (error) {
+    setStatus(error.message || "The thumbnail could not be saved.", "error");
+  } finally {
+    els.thumbDownload.disabled = false;
   }
 }
 
@@ -603,6 +774,7 @@ async function startPlaylistJob() {
       items: entries.map(({ title, url }) => ({ title, url })),
       format: state.format,
       quality: quality || null,
+      mute: isMuted(),
       save_to_folder: els.optFolder.checked,
       make_zip: els.optZip.checked,
     }),
@@ -647,7 +819,7 @@ async function requestConversion() {
     return fetch("/api/convert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, format, quality: quality || null }),
+      body: JSON.stringify({ url, format, quality: quality || null, mute: isMuted() }),
     });
   }
 
@@ -661,6 +833,7 @@ async function requestConversion() {
   data.append("file", file);
   data.append("format", format);
   if (quality) data.append("quality", quality);
+  data.append("mute", String(isMuted()));
   return fetch("/api/convert-file", { method: "POST", body: data });
 }
 
@@ -751,9 +924,18 @@ els.chips.addEventListener("change", (event) => {
 });
 els.qualitySelect.addEventListener("change", renderSpec);
 
-els.urlInput.addEventListener("input", updateClearButton);
+els.urlInput.addEventListener("input", onUrlInput);
+els.urlInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    clearTimeout(state.previewTimer);
+    previewUrl();
+  }
+});
+els.thumbDownload.addEventListener("click", downloadThumbnail);
+els.optMute.addEventListener("change", renderSpec);
 els.clearBtn.addEventListener("click", clearUrl);
-els.previewBtn.addEventListener("click", previewUrl);
+els.previewBtn.addEventListener("click", () => previewUrl());
 els.form.addEventListener("submit", onSubmit);
 
 buildWave();
