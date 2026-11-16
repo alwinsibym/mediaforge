@@ -24,8 +24,8 @@ def fake_download(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "downloads")
     calls = []
 
-    def fake(url, fmt, quality, workdir, extra=None):
-        calls.append((url, fmt, quality, extra))
+    def fake(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
+        calls.append((url, fmt, quality, extra, mute))
         if "bad" in url:
             raise ConversionError("This video is private.")
         output = workdir / f"Song {url[-1]}.mp3"
@@ -206,6 +206,7 @@ def test_playlist_endpoints(client, fake_download, monkeypatch):
         "title": "PL",
         "items": [{"title": "t", "url": "https://e.com/a1"}],
         "format": "sony_mp4",
+        "mute": True,
         "save_to_folder": False,
         "make_zip": True,
     }
@@ -217,6 +218,7 @@ def test_playlist_endpoints(client, fake_download, monkeypatch):
     status = client.get(f"/api/jobs/{job_id}").json()
     assert status["status"] == "done" and status["zip_ready"] is True
     assert fake_download[0][1:3] == ("sony_mp4", "preset")
+    assert fake_download[0][4] is True
     assert client.get(f"/api/jobs/{job_id}/zip").status_code == 200
     assert client.get("/api/jobs/missing").status_code == 404
     assert (

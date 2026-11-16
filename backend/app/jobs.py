@@ -44,6 +44,7 @@ class Job:
     save_to_folder: bool
     make_zip: bool
     staging: Path
+    mute: bool = False
     status: str = "queued"  # queued, running, done, cancelled
     folder: Path | None = None
     zip_path: Path | None = None
@@ -71,6 +72,7 @@ def start_job(
     quality: str,
     save_to_folder: bool,
     make_zip: bool,
+    mute: bool = False,
 ) -> Job:
     """Validate a request, register the job and queue it."""
     if not (save_to_folder or make_zip):
@@ -97,6 +99,7 @@ def start_job(
         save_to_folder=save_to_folder,
         make_zip=make_zip,
         staging=Path(tempfile.mkdtemp(prefix="mediaforge-job-")),
+        mute=mute,
     )
     with _lock:
         _jobs[job.id] = job
@@ -170,6 +173,7 @@ def _run_item(job: Job, item: Item) -> None:
             job.quality,
             workdir,
             {"album": job.title, "track": item.index},
+            mute=job.mute,
         )
         name = validators.safe_filename(f"{item.index:02d} - {output.stem}", max_length=120)
         final = _destination_dir(job) / f"{name}{output.suffix}"

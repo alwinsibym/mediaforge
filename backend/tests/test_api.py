@@ -46,7 +46,7 @@ def test_info_rejects_bad_url(client):
 def test_convert_url_streams_file_and_cleans_up(client, monkeypatch):
     workdirs = []
 
-    def fake_download(url, fmt, quality, workdir, extra=None, notes=None):
+    def fake_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
         workdirs.append(workdir)
         output = workdir / f"Demo.{fmt}"
         output.write_bytes(b"fake-audio")
@@ -64,7 +64,7 @@ def test_convert_url_streams_file_and_cleans_up(client, monkeypatch):
 def test_convert_url_reports_downloader_errors(client, monkeypatch):
     workdirs = []
 
-    def failing_download(url, fmt, quality, workdir, extra=None, notes=None):
+    def failing_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
         workdirs.append(workdir)
         raise ConversionError("This video is longer than the 60-minute limit.")
 
@@ -201,3 +201,43 @@ def test_sony_presets_produce_playable_files(
     assert video["r_frame_rate"] == "30/1"
     assert audio["codec_name"] == audio_codec
     assert int(audio["channels"]) == 2
+
+
+def test_convert_url_passes_the_mute_option(client, monkeypatch):
+    seen = {}
+
+    def fake_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
+        seen.update(quality=quality, mute=mute)
+        output = workdir / "Clip.mp4"
+        output.write_bytes(b"v")
+        if notes is not None:
+            notes.append("Cover art could not be added: test.")
+        return output
+
+    monkeypatch.setattr(main.downloader, "download_and_convert", fake_download)
+    response = client.post(
+        "/api/convert",
+        json={"url": "https://e.com/v", "format": "mp4", "quality": "2160", "mute": True},
+    )
+    assert response.status_code == 200
+    assert seen == {"quality": "2160", "mute": True}
+    assert "Cover%20art" in response.headers["x-mediaforge-note"]
+
+
+@requires_ffmpeg
+def test_convert_file_can_remove_the_sound(client, sample_video, tmp_path):
+    with sample_video.open("rb") as handle:
+        response = client.post(
+            "/api/convert-file",
+            files={"file": ("clip.mp4", handle)},
+            data={"format": "mkv", "quality": "best", "mute": "true"},
+        )
+    assert response.status_code == 200
+    output = tmp_path / "out.mkv"
+    output.write_bytes(response.content)
+    import subprocess
+
+    info = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-i", str(output)], capture_output=True, text=True
+    ).stderr
+    assert "Video:" in info and "Audio:" not in info

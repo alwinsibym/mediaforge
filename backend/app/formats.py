@@ -1,5 +1,7 @@
 """Supported output formats and quality options."""
 
+import re
+
 # ffmpeg audio codec per output format (used by the file-upload converter).
 # "ytdlp" is the codec name yt-dlp's audio extractor expects.
 AUDIO_FORMATS = {
@@ -36,7 +38,12 @@ PRESET_QUALITY = "preset"
 LOSSLESS_AUDIO = {"wav", "flac"}
 
 AUDIO_BITRATES = ["128", "192", "256", "320"]  # kbps
-VIDEO_HEIGHTS = ["360", "480", "720", "1080", "best"]
+VIDEO_HEIGHTS = ["360", "480", "720", "1080", "1440", "2160", "4320", "best"]
+
+# A video quality is "best", a height such as "1080", or a height with a frame-rate cap such
+# as "1080@30" (the best 1080p video that runs at 30 frames per second or less).
+_QUALITY_RE = re.compile(r"^(\d{3,4})(?:@(\d{2,3}))?$")
+MIN_HEIGHT, MAX_HEIGHT = 144, 4320
 
 DEFAULT_AUDIO_BITRATE = "192"
 DEFAULT_VIDEO_HEIGHT = "720"
@@ -59,6 +66,25 @@ def extension(fmt: str) -> str:
     return VIDEO_FORMATS.get(fmt, {}).get("extension", fmt)
 
 
+def parse_quality(quality: str | None) -> tuple[int | None, int | None]:
+    """Split a video quality into (maximum height, maximum frame rate); None means no limit."""
+    match = _QUALITY_RE.match((quality or "").strip())
+    if not match:
+        return None, None
+    height = int(match.group(1))
+    fps = int(match.group(2)) if match.group(2) else None
+    return height, fps
+
+
+def _valid_video_quality(quality: str) -> bool:
+    if quality == "best":
+        return True
+    height, fps = parse_quality(quality)
+    if height is None or not MIN_HEIGHT <= height <= MAX_HEIGHT:
+        return False
+    return fps is None or 1 <= fps <= 240
+
+
 def normalize(fmt: str, quality: str | None) -> tuple[str, str]:
     """Validate a format/quality pair and return the normalised values.
 
@@ -77,7 +103,7 @@ def normalize(fmt: str, quality: str | None) -> tuple[str, str]:
 
     if is_video(fmt):
         quality = (quality or DEFAULT_VIDEO_HEIGHT).strip()
-        if quality not in VIDEO_HEIGHTS:
+        if not _valid_video_quality(quality):
             raise ValueError(f"Unsupported video quality '{quality}'.")
         return fmt, quality
 

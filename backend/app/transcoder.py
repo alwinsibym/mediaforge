@@ -24,34 +24,42 @@ _SONY_SCALE = (
 _SONY_VIDEO_COMMON = ["-vf", _SONY_SCALE, "-r", "30", "-pix_fmt", "yuv420p", "-c:v", "mpeg4"]
 _SONY_VIDEO_COMMON += ["-bf", "0", "-g", "60"]
 _SONY_STREAMS = ["-map", "0:v:0", "-map", "0:a:0?", "-sn", "-map_metadata", "0"]
+_SONY_STREAMS_MUTED = ["-map", "0:v:0", "-an", "-sn", "-map_metadata", "0"]
 
 
-def _sony_args(fmt: str) -> list[str]:
+def _sony_args(fmt: str, mute: bool = False) -> list[str]:
     if fmt == "sony_mp4":
         # 3.3 Mbps video + 192 kbps audio stays under the 4 Mbps limit.
         video = ["-b:v", "3300k", "-maxrate", "3500k", "-bufsize", "3500k"]
         audio = ["-c:a", "aac", "-b:a", "192k", "-ac", "2", "-ar", "44100"]
-        return _SONY_STREAMS + _SONY_VIDEO_COMMON + video + audio + ["-movflags", "+faststart"]
+        streams = _SONY_STREAMS_MUTED if mute else _SONY_STREAMS
+        audio = [] if mute else audio
+        return streams + _SONY_VIDEO_COMMON + video + audio + ["-movflags", "+faststart"]
     video = ["-b:v", "6500k", "-maxrate", "7200k", "-bufsize", "7200k", "-vtag", "XVID"]
     audio = ["-c:a", "libmp3lame", "-b:a", "192k", "-ac", "2", "-ar", "44100"]
-    return _SONY_STREAMS + _SONY_VIDEO_COMMON + video + audio
+    streams = _SONY_STREAMS_MUTED if mute else _SONY_STREAMS
+    audio = [] if mute else audio
+    return streams + _SONY_VIDEO_COMMON + video + audio
 
 
-def build_command(source: Path, target: Path, fmt: str, quality: str) -> list[str]:
+def build_command(
+    source: Path, target: Path, fmt: str, quality: str, mute: bool = False
+) -> list[str]:
     """Build the ffmpeg argument list for converting `source` into `fmt`."""
     ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
     command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(source)]
 
     if formats.is_preset(fmt):
-        command += _sony_args(fmt)
+        command += _sony_args(fmt, mute)
     elif formats.is_audio(fmt):
         command += ["-vn", "-c:a", formats.AUDIO_FORMATS[fmt]["ffmpeg_codec"]]
         if fmt not in formats.LOSSLESS_AUDIO:
             command += ["-b:a", f"{quality}k"]
     else:
-        if quality != "best":
+        height, _ = formats.parse_quality(quality)
+        if height:
             # Scale down only; never upscale. -2 keeps the width even.
-            command += ["-vf", f"scale=-2:'min(ih,{quality})'"]
+            command += ["-vf", f"scale=-2:'min(ih,{height})'"]
         if fmt == "webm":
             command += [
                 "-c:v",
@@ -62,11 +70,11 @@ def build_command(source: Path, target: Path, fmt: str, quality: str) -> list[st
                 "0",
                 "-row-mt",
                 "1",
-                "-c:a",
-                "libopus",
             ]
+            command += ["-an"] if mute else ["-c:a", "libopus"]
         else:  # mp4, mkv
-            command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "aac"]
+            command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
+            command += ["-an"] if mute else ["-c:a", "aac"]
             if fmt == "mp4":
                 command += ["-movflags", "+faststart"]
 
@@ -74,7 +82,7 @@ def build_command(source: Path, target: Path, fmt: str, quality: str) -> list[st
     return command
 
 
-def convert_file(source: Path, fmt: str, quality: str, workdir: Path) -> Path:
+def convert_file(source: Path, fmt: str, quality: str, workdir: Path, mute: bool = False) -> Path:
     """Convert `source` and return the path of the converted file."""
     if not ffmpeg_available():
         raise ConversionError(FFMPEG_HELP)
@@ -86,7 +94,7 @@ def convert_file(source: Path, fmt: str, quality: str, workdir: Path) -> Path:
 
     try:
         result = subprocess.run(
-            build_command(source, target, fmt, quality),
+            build_command(source, target, fmt, quality, mute),
             capture_output=True,
             text=True,
             timeout=FFMPEG_TIMEOUT_SECONDS,
@@ -100,3 +108,27 @@ def convert_file(source: Path, fmt: str, quality: str, workdir: Path) -> Path:
         raise ConversionError(f"FFmpeg could not convert this file: {reason[:200]}")
 
     return target
+
+
+def strip_audio(path: Path) -> None:
+    """Remove the sound from a finished video file, without re-encoding the picture."""
+    if not ffmpeg_available():
+        raise ConversionError(FFMPEG_HELP)
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
+    silent = path.with_name(f"{path.stem}.silent{path.suffix}")
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(path)]
+    command += ["-map", "0", "-map", "-0:a", "-c", "copy", "-map_metadata", "0", str(silent)]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired as exc:
+        silent.unlink(missing_ok=True)
+        raise ConversionError("Removing the sound took too long and was stopped.") from exc
+    if result.returncode != 0 or not silent.exists():
+        silent.unlink(missing_ok=True)
+        lines = (result.stderr or "").strip().splitlines()
+        raise ConversionError(
+            f"FFmpeg could not remove the sound: {(lines or ['error'])[-1][:200]}"
+        )
+    silent.replace(path)

@@ -79,8 +79,86 @@ def _base_options() -> dict:
     return options
 
 
+_RESOLUTION_NAMES = {4320: "8K", 2160: "4K", 1440: "2K"}
+
+
+def _format_size(entry: dict) -> int | None:
+    return entry.get("filesize") or entry.get("filesize_approx")
+
+
+def _video_qualities(source_formats: list[dict]) -> list[dict]:
+    """The video qualities a video really offers, best first, with no upscaling.
+
+    Each entry has an `id` that can be sent back as the quality: "2160" or "1440@30".
+    """
+    videos = [
+        f
+        for f in source_formats
+        if f.get("vcodec") not in (None, "none") and f.get("height") and f.get("width")
+    ]
+    audio_sizes = [
+        _format_size(f)
+        for f in source_formats
+        if f.get("acodec") not in (None, "none") and f.get("vcodec") in (None, "none")
+    ]
+    audio_size = max((size for size in audio_sizes if size), default=0)
+
+    by_height: dict[int, list[dict]] = {}
+    for entry in videos:
+        by_height.setdefault(int(entry["height"]), []).append(entry)
+
+    qualities = []
+    for height in sorted(by_height, reverse=True):
+        group = by_height[height]
+        smooth = [f for f in group if (f.get("fps") or 30) > 30]
+        normal = [f for f in group if (f.get("fps") or 30) <= 30]
+        name = _RESOLUTION_NAMES.get(height)
+        # (id, formats, label suffix); the smooth variant is the default for this height.
+        variants = []
+        if smooth:
+            fps = round(max(f["fps"] for f in smooth))
+            variants.append((str(height), smooth, f"p{fps}"))
+            if normal:
+                variants.append((f"{height}@30", normal, "p30"))
+        else:
+            variants.append((str(height), normal, "p"))
+        for quality_id, members, suffix in variants:
+            sizes = [_format_size(f) for f in members if _format_size(f)]
+            size = (max(sizes) + audio_size) if sizes else None
+            qualities.append(
+                {
+                    "id": quality_id,
+                    "label": f"{height}{suffix}" + (f" ({name})" if name else ""),
+                    "height": height,
+                    "fps": round(max(f.get("fps") or 30 for f in members)),
+                    "size": size,
+                }
+            )
+    return qualities
+
+
+def _thumbnail_options(info: dict) -> list[dict]:
+    """Thumbnail sizes offered by the site, largest first, one per size."""
+    chosen: dict[tuple[int, int], dict] = {}
+    for thumb in info.get("thumbnails") or []:
+        width, height, link = thumb.get("width"), thumb.get("height"), thumb.get("url")
+        if not (width and height and link and link.startswith("http")):
+            continue
+        key = (int(width), int(height))
+        # Prefer JPEG over WebP when both exist at the same size.
+        if key not in chosen or ".jpg" in link.split("?")[0]:
+            chosen[key] = {"id": str(thumb.get("id") or len(chosen)), "url": link}
+    result = [
+        {"id": item["id"], "width": w, "height": h, "label": f"{w} x {h}"}
+        for (w, h), item in sorted(chosen.items(), key=lambda kv: kv[0][0] * kv[0][1], reverse=True)
+    ]
+    if not result and info.get("thumbnail"):
+        result = [{"id": "default", "width": None, "height": None, "label": "Default size"}]
+    return result
+
+
 def fetch_info(url: str) -> dict:
-    """Return basic metadata for a URL without downloading it."""
+    """Return metadata for a URL without downloading it."""
     options = {**_base_options(), "skip_download": True}
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
@@ -91,9 +169,13 @@ def fetch_info(url: str) -> dict:
     return {
         "title": info.get("title") or "Untitled",
         "duration": info.get("duration"),
-        "uploader": info.get("uploader"),
+        "uploader": info.get("uploader") or info.get("channel"),
         "thumbnail": info.get("thumbnail"),
+        "thumbnails": _thumbnail_options(info),
+        "view_count": info.get("view_count"),
+        "upload_date": info.get("upload_date"),
         "is_live": bool(info.get("is_live")),
+        "qualities": _video_qualities(info.get("formats") or []),
     }
 
 
@@ -142,22 +224,37 @@ def fetch_playlist(url: str) -> dict:
     }
 
 
-def _video_selector(fmt: str, height: str) -> str:
+def _video_selector(fmt: str, quality: str, mute: bool = False) -> str:
+    """Build the yt-dlp format selector for a video format and quality."""
     if formats.is_preset(fmt):
         # Car presets are re-encoded at 720x576 or less, so skip bigger downloads.
         return "bestvideo[height<=576]+bestaudio/best[height<=576]/bestvideo+bestaudio/best"
-    h = "" if height == "best" else f"[height<={height}]"
+
+    height, fps = formats.parse_quality(quality)
+    cap = (f"[height<={height}]" if height else "") + (f"[fps<={fps}]" if fps else "")
+    # H.264 plays on almost everything but YouTube stops offering it above 1080p.
+    plays_everywhere = bool(height and height <= 1080)
+
+    if mute:
+        if fmt == "mp4" and plays_everywhere:
+            return f"bestvideo[vcodec^=avc1]{cap}/bestvideo{cap}/best{cap}"
+        if fmt == "webm":
+            return f"bestvideo[ext=webm]{cap}/bestvideo{cap}/best{cap}"
+        return f"bestvideo{cap}/best{cap}"
+
     if fmt == "mp4":
-        return (
-            f"bestvideo[ext=mp4]{h}+bestaudio[ext=m4a]"
-            f"/best[ext=mp4]{h}/bestvideo{h}+bestaudio/best{h}"
-        )
+        if plays_everywhere:
+            return (
+                f"bestvideo[vcodec^=avc1]{cap}+bestaudio[ext=m4a]"
+                f"/best[ext=mp4][vcodec^=avc1]{cap}/bestvideo{cap}+bestaudio/best{cap}"
+            )
+        return f"bestvideo{cap}+bestaudio[ext=m4a]/bestvideo{cap}+bestaudio/best{cap}"
     if fmt == "webm":
         return (
-            f"bestvideo[ext=webm]{h}+bestaudio[ext=webm]"
-            f"/best[ext=webm]{h}/bestvideo{h}+bestaudio/best{h}"
+            f"bestvideo[ext=webm]{cap}+bestaudio[ext=webm]"
+            f"/best[ext=webm]{cap}/bestvideo{cap}+bestaudio/best{cap}"
         )
-    return f"bestvideo{h}+bestaudio/best{h}"  # mkv
+    return f"bestvideo{cap}+bestaudio/best{cap}"  # mkv
 
 
 # Output formats that can carry a cover image. Ogg, Opus and FLAC need the mutagen package.
@@ -212,7 +309,9 @@ def _metadata_postprocessors(fmt: str, extra: dict | None) -> list[dict]:
     return processors
 
 
-def _build_options(fmt: str, quality: str, workdir: Path, extra: dict | None = None) -> dict:
+def _build_options(
+    fmt: str, quality: str, workdir: Path, extra: dict | None = None, mute: bool = False
+) -> dict:
     options = _base_options()
     options["outtmpl"] = str(workdir / "%(title).80s.%(ext)s")
 
@@ -227,7 +326,10 @@ def _build_options(fmt: str, quality: str, workdir: Path, extra: dict | None = N
         options["postprocessors"] = [postprocessor]
         options["postprocessors"] += _metadata_postprocessors(fmt, extra)
     else:
-        options["format"] = _video_selector(fmt, quality)
+        options["format"] = _video_selector(fmt, quality, mute)
+        # Highest resolution, then frame rate. VP9 beats AV1 on a tie because it plays on more
+        # devices.
+        options["format_sort"] = ["res", "fps", "vcodec:vp9", "acodec"]
         if formats.is_preset(fmt):
             # Download into MKV (holds any codec); FFmpeg re-encodes it afterwards.
             options["merge_output_format"] = "mkv"
@@ -278,6 +380,7 @@ def download_and_convert(
     workdir: Path,
     extra: dict | None = None,
     notes: list[str] | None = None,
+    mute: bool = False,
 ) -> Path:
     """Download `url`, convert it to `fmt`, and return the output file path.
 
@@ -296,7 +399,7 @@ def download_and_convert(
         limit_min = config.MAX_DURATION_SECONDS // 60
         raise ConversionError(f"This video is longer than the {limit_min}-minute limit.")
 
-    options = _build_options(fmt, quality, workdir, extra)
+    options = _build_options(fmt, quality, workdir, extra, mute and formats.is_video(fmt))
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             ydl.download([url])
@@ -307,11 +410,15 @@ def download_and_convert(
         from . import transcoder  # imported here because transcoder imports this module
 
         downloaded = _find_output(workdir, "mkv")
-        output = transcoder.convert_file(downloaded, fmt, quality, workdir)
+        output = transcoder.convert_file(downloaded, fmt, quality, workdir, mute)
         downloaded.unlink(missing_ok=True)
         return output
 
     output = _find_output(workdir, fmt)
+    if mute and formats.is_video(fmt):
+        from . import transcoder
+
+        transcoder.strip_audio(output)
     if fmt in cover.COVER_FORMATS:
         _add_cover(output, workdir, notes)
     return output

@@ -87,7 +87,7 @@ def test_preset_output_is_reencoded_for_the_car(monkeypatch, tmp_path):
         def download(self, urls):
             (tmp_path / "Song.mkv").write_bytes(b"video")
 
-    def fake_convert(source, fmt, quality, workdir):
+    def fake_convert(source, fmt, quality, workdir, mute=False):
         calls["convert"] = (source.name, fmt, quality)
         target = workdir / "Song.mp4"
         target.write_bytes(b"car")

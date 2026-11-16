@@ -37,6 +37,7 @@ class ConvertRequest(BaseModel):
     url: str
     format: str = "mp3"
     quality: str | None = None
+    mute: bool = False  # video only: leave the sound out
 
 
 class PlaylistItem(BaseModel):
@@ -49,6 +50,7 @@ class JobRequest(BaseModel):
     items: list[PlaylistItem]
     format: str = "mp3"
     quality: str | None = None
+    mute: bool = False
     save_to_folder: bool = True
     make_zip: bool = False
 
@@ -113,7 +115,14 @@ async def convert_url(body: ConvertRequest) -> FileResponse:
         fmt, quality = formats.normalize(body.format, body.quality)
         notes: list[str] = []
         output = await run_in_threadpool(
-            downloader.download_and_convert, url, fmt, quality, Path(workdir), None, notes
+            downloader.download_and_convert,
+            url,
+            fmt,
+            quality,
+            Path(workdir),
+            None,
+            notes,
+            body.mute,
         )
     except (ValueError, ConversionError) as exc:
         _cleanup(workdir)
@@ -146,6 +155,7 @@ async def convert_upload(
     file: UploadFile = File(...),
     format: str = Form("mp3"),
     quality: str | None = Form(None),
+    mute: bool = Form(False),
 ) -> FileResponse:
     """Convert an uploaded audio/video file to the requested format."""
     workdir = tempfile.mkdtemp(prefix="mediaforge-")
@@ -155,7 +165,7 @@ async def convert_upload(
         source = Path(workdir) / name
         await _save_upload(file, source)
         output = await run_in_threadpool(
-            transcoder.convert_file, source, fmt, quality, Path(workdir)
+            transcoder.convert_file, source, fmt, quality, Path(workdir), mute
         )
     except (ValueError, ConversionError) as exc:
         _cleanup(workdir)
@@ -188,6 +198,7 @@ def create_job(body: JobRequest) -> dict:
             quality,
             body.save_to_folder,
             body.make_zip,
+            body.mute,
         )
     except ValueError as exc:
         raise _bad_request(exc) from exc

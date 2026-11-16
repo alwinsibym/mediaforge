@@ -26,7 +26,27 @@ def test_bad_quality_rejected():
     with pytest.raises(ValueError):
         formats.normalize("mp3", "9999")
     with pytest.raises(ValueError):
-        formats.normalize("mp4", "144")
+        formats.normalize("mp4", "100")
+    with pytest.raises(ValueError):
+        formats.normalize("mp4", "9000")
+    with pytest.raises(ValueError):
+        formats.normalize("mp4", "1080@")
+    with pytest.raises(ValueError):
+        formats.normalize("mp4", "abc")
+
+
+def test_video_quality_can_name_a_height_and_a_frame_rate():
+    assert formats.normalize("mp4", "2160") == ("mp4", "2160")
+    assert formats.normalize("mkv", "1440@30") == ("mkv", "1440@30")
+    assert formats.normalize("webm", "best") == ("webm", "best")
+    assert formats.normalize("mp4", "144") == ("mp4", "144")
+
+
+def test_parse_quality():
+    assert formats.parse_quality("1080") == (1080, None)
+    assert formats.parse_quality("1440@30") == (1440, 30)
+    assert formats.parse_quality("best") == (None, None)
+    assert formats.parse_quality(None) == (None, None)
 
 
 def test_catalogue_lists_every_format():
