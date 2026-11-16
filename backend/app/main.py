@@ -40,6 +40,13 @@ class ConvertRequest(BaseModel):
     mute: bool = False  # video only: leave the sound out
 
 
+class ThumbnailRequest(BaseModel):
+    url: str
+    id: str
+    format: str = "jpg"
+    square: bool = False
+
+
 class PlaylistItem(BaseModel):
     title: str = ""
     url: str
@@ -104,6 +111,24 @@ async def video_info(body: UrlRequest) -> dict:
         return await run_in_threadpool(downloader.fetch_info, url)
     except (ValueError, ConversionError) as exc:
         raise _bad_request(exc) from exc
+
+
+@app.post("/api/thumbnail")
+async def get_thumbnail(body: ThumbnailRequest) -> FileResponse:
+    """Download one of a video's thumbnails as JPG, PNG or WebP."""
+    workdir = tempfile.mkdtemp(prefix="mediaforge-")
+    try:
+        url = validators.validate_url(body.url)
+        output = await run_in_threadpool(
+            downloader.download_thumbnail, url, body.id, body.format, body.square, Path(workdir)
+        )
+    except (ValueError, ConversionError) as exc:
+        _cleanup(workdir)
+        raise _bad_request(exc) from exc
+    except Exception:
+        _cleanup(workdir)
+        raise HTTPException(status_code=500, detail="Unexpected server error.") from None
+    return _file_response(output, workdir)
 
 
 @app.post("/api/convert")

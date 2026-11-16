@@ -4,6 +4,7 @@ import importlib.util
 import os
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ import yt_dlp
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 from yt_dlp.utils import DownloadError
 
-from . import config, cover, ffmpeg_locator, formats
+from . import config, cover, ffmpeg_locator, formats, validators
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
@@ -137,8 +138,8 @@ def _video_qualities(source_formats: list[dict]) -> list[dict]:
     return qualities
 
 
-def _thumbnail_options(info: dict) -> list[dict]:
-    """Thumbnail sizes offered by the site, largest first, one per size."""
+def _thumbnail_sources(info: dict) -> list[dict]:
+    """Thumbnail sizes offered by the site, largest first, one per size (with their links)."""
     chosen: dict[tuple[int, int], dict] = {}
     for thumb in info.get("thumbnails") or []:
         width, height, link = thumb.get("width"), thumb.get("height"), thumb.get("url")
@@ -149,12 +150,81 @@ def _thumbnail_options(info: dict) -> list[dict]:
         if key not in chosen or ".jpg" in link.split("?")[0]:
             chosen[key] = {"id": str(thumb.get("id") or len(chosen)), "url": link}
     result = [
-        {"id": item["id"], "width": w, "height": h, "label": f"{w} x {h}"}
+        {"id": item["id"], "url": item["url"], "width": w, "height": h, "label": f"{w} x {h}"}
         for (w, h), item in sorted(chosen.items(), key=lambda kv: kv[0][0] * kv[0][1], reverse=True)
     ]
     if not result and info.get("thumbnail"):
-        result = [{"id": "default", "width": None, "height": None, "label": "Default size"}]
+        result = [
+            {
+                "id": "default",
+                "url": info["thumbnail"],
+                "width": None,
+                "height": None,
+                "label": "Default size",
+            }
+        ]
     return result
+
+
+def _thumbnail_options(info: dict) -> list[dict]:
+    """The thumbnail sizes shown to the user (without the links)."""
+    return [{k: v for k, v in item.items() if k != "url"} for item in _thumbnail_sources(info)]
+
+
+THUMBNAIL_FORMATS = {"jpg", "png", "webp"}
+_THUMBNAIL_SUFFIXES = {".jpg": "jpg", ".jpeg": "jpg", ".png": "png", ".webp": "webp"}
+_THUMBNAIL_ENCODERS = {
+    "jpg": ["-q:v", "2", "-pix_fmt", "yuvj420p"],
+    "png": [],
+    "webp": ["-quality", "90"],
+}
+
+
+def download_thumbnail(url: str, thumb_id: str, fmt: str, square: bool, workdir: Path) -> Path:
+    """Save one of a video's thumbnails, optionally cropped to a square and converted."""
+    fmt = (fmt or "jpg").lower().strip()
+    if fmt not in THUMBNAIL_FORMATS:
+        raise ValueError(f"Unsupported image format '{fmt}'.")
+
+    options = {**_base_options(), "skip_download": True}
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False)
+            sources = {item["id"]: item for item in _thumbnail_sources(info)}
+            if thumb_id not in sources:
+                raise ConversionError("That thumbnail size is not available for this video.")
+            chosen = sources[thumb_id]
+            data = ydl.urlopen(chosen["url"]).read()
+    except DownloadError as exc:
+        raise ConversionError(_clean_error(exc)) from exc
+    except OSError as exc:
+        raise ConversionError("The thumbnail could not be downloaded.") from exc
+
+    link_suffix = Path(chosen["url"].split("?")[0]).suffix.lower()
+    source_fmt = _THUMBNAIL_SUFFIXES.get(link_suffix, "jpg")
+    name = validators.safe_filename(info.get("title"), default="thumbnail", max_length=80)
+    size = f" - {chosen['width']}x{chosen['height']}" if chosen["width"] else ""
+    suffix = "-square" if square else ""
+    target = workdir / f"{name}{size}{suffix}.{fmt}"
+
+    raw = workdir / f"source.{source_fmt}"
+    raw.write_bytes(data)
+    if source_fmt == fmt and not square:
+        raw.replace(target)
+        return target
+
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg")
+    if not ffmpeg:
+        raise ConversionError(FFMPEG_HELP)
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw)]
+    if square:
+        command += ["-vf", "crop='min(iw,ih)':'min(iw,ih)'"]
+    command += ["-frames:v", "1", *_THUMBNAIL_ENCODERS[fmt], str(target)]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
+    raw.unlink(missing_ok=True)
+    if result.returncode != 0 or not target.exists():
+        raise ConversionError("The thumbnail could not be converted.")
+    return target
 
 
 def fetch_info(url: str) -> dict:
