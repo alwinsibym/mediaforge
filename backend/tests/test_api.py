@@ -1,9 +1,11 @@
+import shutil
 from pathlib import Path
 
 import pytest
 
 from app import config, main
 from app.downloader import ConversionError
+from tests.conftest import requires_ffmpeg
 
 
 def test_health(client):
@@ -156,3 +158,46 @@ def test_convert_url_explains_missing_ffmpeg(client, monkeypatch):
     response = client.post("/api/convert", json={"url": "https://example.com/v", "format": "mp4"})
     assert response.status_code == 400
     assert "FFmpeg was not found" in response.json()["detail"]
+
+
+def _probe(path):
+    """Describe the first video and audio streams using ffprobe."""
+    import json
+    import subprocess
+
+    result = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    streams = json.loads(result.stdout)["streams"]
+    video = next(s for s in streams if s["codec_type"] == "video")
+    audio = next(s for s in streams if s["codec_type"] == "audio")
+    return video, audio
+
+
+@requires_ffmpeg
+@pytest.mark.skipif(shutil.which("ffprobe") is None, reason="ffprobe is not installed")
+@pytest.mark.parametrize(
+    ("fmt", "suffix", "audio_codec"),
+    [("sony_mp4", ".mp4", "aac"), ("sony_avi", ".avi", "mp3")],
+)
+def test_sony_presets_produce_playable_files(
+    client, sample_video, tmp_path, fmt, suffix, audio_codec
+):
+    with sample_video.open("rb") as handle:
+        response = client.post(
+            "/api/convert-file", files={"file": ("clip.mp4", handle)}, data={"format": fmt}
+        )
+    assert response.status_code == 200
+    output = tmp_path / f"out{suffix}"
+    output.write_bytes(response.content)
+
+    video, audio = _probe(output)
+    assert video["codec_name"] == "mpeg4"
+    assert video["profile"] == "Simple Profile"
+    assert int(video["width"]) <= 720 and int(video["height"]) <= 576
+    assert video["r_frame_rate"] == "30/1"
+    assert audio["codec_name"] == audio_codec
+    assert int(audio["channels"]) == 2

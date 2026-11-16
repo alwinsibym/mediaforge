@@ -33,3 +33,20 @@ def test_catalogue_lists_every_format():
     catalogue = formats.describe()
     assert {f["id"] for f in catalogue["audio"]} == set(formats.AUDIO_FORMATS)
     assert {f["id"] for f in catalogue["video"]} == set(formats.VIDEO_FORMATS)
+
+
+def test_sony_presets_have_fixed_quality():
+    assert formats.normalize("sony_mp4", None) == ("sony_mp4", "preset")
+    assert formats.normalize("sony_avi", "1080") == ("sony_avi", "preset")
+
+
+def test_sony_presets_use_their_own_extension():
+    assert formats.extension("sony_mp4") == "mp4"
+    assert formats.extension("sony_avi") == "avi"
+    assert formats.extension("mkv") == "mkv"
+
+
+def test_catalogue_marks_presets():
+    video = {item["id"]: item for item in formats.describe()["video"]}
+    assert video["sony_mp4"]["preset"] is True
+    assert video["mp4"]["preset"] is False

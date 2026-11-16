@@ -16,7 +16,21 @@ VIDEO_FORMATS = {
     "mp4": {"label": "MP4 (H.264)"},
     "webm": {"label": "WebM (VP9)"},
     "mkv": {"label": "MKV"},
+    # Presets for older car head units. The quality is fixed by the preset.
+    "sony_mp4": {
+        "label": "Sony car MP4 (XAV-W650BT)",
+        "extension": "mp4",
+        "preset": True,
+    },
+    "sony_avi": {
+        "label": "Sony car AVI (Xvid)",
+        "extension": "avi",
+        "preset": True,
+    },
 }
+
+# Quality value used by presets, which have no quality choices of their own.
+PRESET_QUALITY = "preset"
 
 # Lossless formats ignore the bitrate setting.
 LOSSLESS_AUDIO = {"wav", "flac"}
@@ -36,6 +50,15 @@ def is_video(fmt: str) -> bool:
     return fmt in VIDEO_FORMATS
 
 
+def is_preset(fmt: str) -> bool:
+    return bool(VIDEO_FORMATS.get(fmt, {}).get("preset"))
+
+
+def extension(fmt: str) -> str:
+    """File extension (without the dot) for an output format."""
+    return VIDEO_FORMATS.get(fmt, {}).get("extension", fmt)
+
+
 def normalize(fmt: str, quality: str | None) -> tuple[str, str]:
     """Validate a format/quality pair and return the normalised values.
 
@@ -48,6 +71,9 @@ def normalize(fmt: str, quality: str | None) -> tuple[str, str]:
         if quality not in AUDIO_BITRATES:
             raise ValueError(f"Unsupported audio bitrate '{quality}'.")
         return fmt, quality
+
+    if is_preset(fmt):
+        return fmt, PRESET_QUALITY
 
     if is_video(fmt):
         quality = (quality or DEFAULT_VIDEO_HEIGHT).strip()
@@ -62,7 +88,10 @@ def describe() -> dict:
     """Format catalogue sent to the frontend."""
     return {
         "audio": [{"id": k, "label": v["label"]} for k, v in AUDIO_FORMATS.items()],
-        "video": [{"id": k, "label": v["label"]} for k, v in VIDEO_FORMATS.items()],
+        "video": [
+            {"id": k, "label": v["label"], "preset": bool(v.get("preset"))}
+            for k, v in VIDEO_FORMATS.items()
+        ],
         "audio_bitrates": AUDIO_BITRATES,
         "video_heights": VIDEO_HEIGHTS,
         "lossless_audio": sorted(LOSSLESS_AUDIO),

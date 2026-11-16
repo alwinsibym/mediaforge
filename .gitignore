@@ -20,6 +20,8 @@ downloads/
 *.mp4
 *.webm
 *.mkv
+*.avi
+*.zip
 
 # Editor / OS
 .vscode/
