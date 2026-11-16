@@ -7,4 +7,8 @@ services:
       # Optional limits (defaults shown).
       MEDIAFORGE_MAX_DURATION: "3600"   # seconds
       MEDIAFORGE_MAX_UPLOAD_MB: "500"
+      MEDIAFORGE_DOWNLOAD_DIR: /app/downloads
+    volumes:
+      # Playlist folders appear in ./downloads on your computer.
+      - ./downloads:/app/downloads
     restart: unless-stopped
