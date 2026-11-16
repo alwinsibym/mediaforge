@@ -60,3 +60,48 @@ def test_download_fails_early_without_ffmpeg(monkeypatch, tmp_path):
     )
     with pytest.raises(downloader.ConversionError, match="FFmpeg was not found"):
         downloader.download_and_convert("https://example.com/v", "mp4", "1080", tmp_path)
+
+
+def test_preset_downloads_small_and_merges_to_mkv():
+    options = downloader._build_options("sony_mp4", "preset", Path("/tmp/x"))
+    assert "height<=576" in options["format"]
+    assert options["merge_output_format"] == "mkv"
+    assert "postprocessors" not in options or not any(
+        pp.get("key") == "FFmpegVideoConvertor" for pp in options["postprocessors"]
+    )
+
+
+def test_preset_output_is_reencoded_for_the_car(monkeypatch, tmp_path):
+    calls = {}
+
+    class FakeYDL:
+        def __init__(self, options):
+            calls["options"] = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def download(self, urls):
+            (tmp_path / "Song.mkv").write_bytes(b"video")
+
+    def fake_convert(source, fmt, quality, workdir):
+        calls["convert"] = (source.name, fmt, quality)
+        target = workdir / "Song.mp4"
+        target.write_bytes(b"car")
+        return target
+
+    from app import transcoder
+
+    monkeypatch.setattr(downloader, "ffmpeg_ready", lambda: True)
+    monkeypatch.setattr(downloader, "fetch_info", lambda url: {"is_live": False, "duration": 10})
+    monkeypatch.setattr(downloader.yt_dlp, "YoutubeDL", FakeYDL)
+    monkeypatch.setattr(transcoder, "convert_file", fake_convert)
+
+    output = downloader.download_and_convert("https://e.com/v", "sony_mp4", "preset", tmp_path)
+
+    assert output.name == "Song.mp4"
+    assert calls["convert"] == ("Song.mkv", "sony_mp4", "preset")
+    assert not (tmp_path / "Song.mkv").exists()

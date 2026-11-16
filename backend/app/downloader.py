@@ -96,6 +96,9 @@ def fetch_info(url: str) -> dict:
 
 
 def _video_selector(fmt: str, height: str) -> str:
+    if formats.is_preset(fmt):
+        # Car presets are re-encoded at 720x576 or less, so skip bigger downloads.
+        return "bestvideo[height<=576]+bestaudio/best[height<=576]/bestvideo+bestaudio/best"
     h = "" if height == "best" else f"[height<={height}]"
     if fmt == "mp4":
         return (
@@ -125,19 +128,23 @@ def _build_options(fmt: str, quality: str, workdir: Path) -> dict:
         options["postprocessors"] = [postprocessor]
     else:
         options["format"] = _video_selector(fmt, quality)
-        options["merge_output_format"] = fmt
-        # Re-mux only when the downloaded container differs from the request.
-        options["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": fmt}]
+        if formats.is_preset(fmt):
+            # Download into MKV (holds any codec); FFmpeg re-encodes it afterwards.
+            options["merge_output_format"] = "mkv"
+        else:
+            options["merge_output_format"] = fmt
+            # Re-mux only when the downloaded container differs from the request.
+            options["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": fmt}]
     return options
 
 
-def _find_output(workdir: Path, fmt: str) -> Path:
+def _find_output(workdir: Path, extension: str) -> Path:
     files = [
         p for p in workdir.iterdir() if p.is_file() and p.suffix not in {".part", ".ytdl", ".tmp"}
     ]
     if not files:
         raise ConversionError("Conversion finished but no file was produced.")
-    preferred = [p for p in files if p.suffix.lower() == f".{fmt}"]
+    preferred = [p for p in files if p.suffix.lower() == f".{extension}"]
     return max(preferred or files, key=lambda p: p.stat().st_size)
 
 
@@ -161,5 +168,13 @@ def download_and_convert(url: str, fmt: str, quality: str, workdir: Path) -> Pat
             ydl.download([url])
     except DownloadError as exc:
         raise ConversionError(_clean_error(exc)) from exc
+
+    if formats.is_preset(fmt):
+        from . import transcoder  # imported here because transcoder imports this module
+
+        downloaded = _find_output(workdir, "mkv")
+        output = transcoder.convert_file(downloaded, fmt, quality, workdir)
+        downloaded.unlink(missing_ok=True)
+        return output
 
     return _find_output(workdir, fmt)
