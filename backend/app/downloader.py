@@ -97,6 +97,51 @@ def fetch_info(url: str) -> dict:
     }
 
 
+def fetch_playlist(url: str) -> dict:
+    """List the videos in a playlist link without downloading anything."""
+    options = {
+        **_base_options(),
+        "skip_download": True,
+        "extract_flat": "in_playlist",
+        "noplaylist": False,
+        "playlistend": config.MAX_PLAYLIST_ITEMS,
+    }
+    try:
+        with yt_dlp.YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except DownloadError as exc:
+        raise ConversionError(_clean_error(exc)) from exc
+
+    raw_entries = [entry for entry in (info.get("entries") or []) if entry]
+    if info.get("_type") != "playlist" or not raw_entries:
+        raise ConversionError("That link is not a playlist. Use the Link tab for a single video.")
+
+    entries = []
+    for entry in raw_entries:
+        link = entry.get("url") or entry.get("webpage_url")
+        if link and not link.startswith("http") and entry.get("id"):
+            link = f"https://www.youtube.com/watch?v={entry['id']}"
+        if not link or not link.startswith("http"):
+            continue  # private or deleted videos have no link
+        entries.append(
+            {
+                "index": len(entries) + 1,
+                "title": entry.get("title") or "Untitled",
+                "url": link,
+                "duration": entry.get("duration"),
+            }
+        )
+    if not entries:
+        raise ConversionError("None of the videos in that playlist can be downloaded.")
+
+    return {
+        "title": info.get("title") or "Playlist",
+        "uploader": info.get("uploader") or info.get("channel"),
+        "entries": entries,
+        "limit": config.MAX_PLAYLIST_ITEMS,
+    }
+
+
 def _video_selector(fmt: str, height: str) -> str:
     if formats.is_preset(fmt):
         # Car presets are re-encoded at 720x576 or less, so skip bigger downloads.

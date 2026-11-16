@@ -16,3 +16,14 @@ FRONTEND_DIR = Path(
         Path(__file__).resolve().parents[2] / "frontend",
     )
 )
+
+# Where playlist downloads are saved (repo_root/downloads by default).
+DOWNLOAD_DIR = Path(
+    os.getenv(
+        "MEDIAFORGE_DOWNLOAD_DIR",
+        Path(__file__).resolve().parents[2] / "downloads",
+    )
+)
+
+# Most videos accepted from one playlist.
+MAX_PLAYLIST_ITEMS = int(os.getenv("MEDIAFORGE_MAX_PLAYLIST_ITEMS", "200"))
