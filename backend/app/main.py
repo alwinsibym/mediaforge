@@ -87,7 +87,9 @@ def list_formats() -> dict:
         "limits": {
             "max_duration_seconds": config.MAX_DURATION_SECONDS,
             "max_upload_mb": config.MAX_UPLOAD_MB,
+            "max_playlist_items": config.MAX_PLAYLIST_ITEMS,
         },
+        "download_dir": str(config.DOWNLOAD_DIR),
     }
 
 

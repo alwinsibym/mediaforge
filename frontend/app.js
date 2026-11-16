@@ -6,8 +6,28 @@ const els = {
   form: $("convert-form"),
   tabUrl: $("tab-url"),
   tabFile: $("tab-file"),
+  tabPlaylist: $("tab-playlist"),
   panelUrl: $("panel-url"),
   panelFile: $("panel-file"),
+  panelPlaylist: $("panel-playlist"),
+  playlistInput: $("playlist-input"),
+  playlistLoad: $("playlist-load"),
+  playlistBox: $("playlist-box"),
+  playlistTitle: $("playlist-title"),
+  playlistCount: $("playlist-count"),
+  playlistAll: $("playlist-all"),
+  playlistList: $("playlist-list"),
+  optFolder: $("opt-folder"),
+  optZip: $("opt-zip"),
+  folderHint: $("folder-hint"),
+  job: $("job"),
+  jobSummary: $("job-summary"),
+  jobCancel: $("job-cancel"),
+  jobBar: $("job-bar"),
+  jobItems: $("job-items"),
+  jobActions: $("job-actions"),
+  jobOpen: $("job-open"),
+  jobZip: $("job-zip"),
   urlInput: $("url-input"),
   clearBtn: $("clear-btn"),
   previewBtn: $("preview-btn"),
@@ -44,6 +64,15 @@ const state = {
   catalogue: null,
   busy: false,
   timer: null,
+  playlist: null,
+  jobId: null,
+  poller: null,
+};
+
+const TABS = {
+  url: { tab: "tab-url", panel: "panel-url" },
+  file: { tab: "tab-file", panel: "panel-file" },
+  playlist: { tab: "tab-playlist", panel: "panel-playlist" },
 };
 
 /* What each output format is made of, for the details panel. */
@@ -154,11 +183,19 @@ function buildWave() {
   });
 }
 
+function submitLabel() {
+  if (state.mode !== "playlist") return "Convert and download";
+  const count = selectedEntries().length;
+  if (!state.playlist) return "Load a playlist first";
+  return count === 1 ? "Convert 1 video" : `Convert ${count} videos`;
+}
+
 function setBusy(busy, { showProgress = false } = {}) {
   state.busy = busy;
   els.submitBtn.disabled = busy;
   els.previewBtn.disabled = busy;
-  els.submitBtn.textContent = busy && showProgress ? "Converting..." : "Convert and download";
+  els.playlistLoad.disabled = busy;
+  els.submitBtn.textContent = busy && showProgress ? "Converting..." : submitLabel();
 
   clearInterval(state.timer);
   els.progress.hidden = !(busy && showProgress);
@@ -281,21 +318,25 @@ async function loadFormats() {
 
 function selectTab(mode) {
   state.mode = mode;
-  const isUrl = mode === "url";
-  els.tabUrl.setAttribute("aria-selected", String(isUrl));
-  els.tabFile.setAttribute("aria-selected", String(!isUrl));
-  els.tabUrl.tabIndex = isUrl ? 0 : -1;
-  els.tabFile.tabIndex = isUrl ? -1 : 0;
-  els.panelUrl.hidden = !isUrl;
-  els.panelFile.hidden = isUrl;
+  for (const [name, ids] of Object.entries(TABS)) {
+    const tab = $(ids.tab);
+    const active = name === mode;
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    $(ids.panel).hidden = !active;
+  }
+  els.submitBtn.textContent = submitLabel();
+  els.submitBtn.disabled = mode === "playlist" && selectedEntries().length === 0;
   setStatus("");
 }
 
 function onTabKeys(event) {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-  const next = state.mode === "url" ? "file" : "url";
+  const names = Object.keys(TABS);
+  const step = event.key === "ArrowRight" ? 1 : -1;
+  const next = names[(names.indexOf(state.mode) + step + names.length) % names.length];
   selectTab(next);
-  (next === "url" ? els.tabUrl : els.tabFile).focus();
+  $(TABS[next].tab).focus();
 }
 
 /* ---------- link preview ---------- */
@@ -385,6 +426,215 @@ function setupDropzone() {
   });
 }
 
+/* ---------- playlist ---------- */
+
+function selectedEntries() {
+  if (!state.playlist) return [];
+  const checked = new Set(
+    [...els.playlistList.querySelectorAll("input:checked")].map((box) => Number(box.value)),
+  );
+  return state.playlist.entries.filter((entry) => checked.has(entry.index));
+}
+
+function updatePlaylistSelection() {
+  const boxes = [...els.playlistList.querySelectorAll("input")];
+  const chosen = boxes.filter((box) => box.checked).length;
+  els.playlistAll.checked = chosen === boxes.length;
+  els.playlistAll.indeterminate = chosen > 0 && chosen < boxes.length;
+  els.playlistCount.textContent = `${chosen} of ${boxes.length} videos selected`;
+  els.submitBtn.textContent = submitLabel();
+  els.submitBtn.disabled = state.busy || chosen === 0;
+}
+
+function updateFolderHint() {
+  const name = state.playlist ? state.playlist.title : "playlist name";
+  const dir = state.catalogue ? state.catalogue.download_dir : "downloads";
+  els.folderHint.textContent = els.optFolder.checked
+    ? `Files are saved in ${dir}, in a folder named after the playlist (${name}).`
+    : "Nothing is kept on disk. Download the ZIP when the job finishes.";
+}
+
+function renderPlaylist(playlist) {
+  els.playlistTitle.textContent = playlist.title;
+  els.playlistList.replaceChildren();
+  for (const entry of playlist.entries) {
+    const item = document.createElement("li");
+    const label = document.createElement("label");
+    label.className = "check";
+
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.value = entry.index;
+    box.checked = true;
+
+    const title = document.createElement("span");
+    title.className = "pl-title";
+    title.textContent = `${entry.index}. ${entry.title}`;
+    title.title = entry.title;
+
+    const time = document.createElement("span");
+    time.className = "pl-time";
+    time.textContent = entry.duration ? formatDuration(entry.duration) : "";
+
+    label.append(box, title, time);
+    item.appendChild(label);
+    els.playlistList.appendChild(item);
+  }
+  els.playlistBox.hidden = false;
+  updatePlaylistSelection();
+  updateFolderHint();
+}
+
+async function loadPlaylist() {
+  const url = els.playlistInput.value.trim();
+  if (!url) {
+    setStatus("Paste a playlist link first.", "error");
+    els.playlistInput.focus();
+    return;
+  }
+  setBusy(true);
+  setStatus("Loading the playlist. Long playlists can take a moment...");
+  try {
+    const response = await fetch("/api/playlist/info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!response.ok) throw new Error(await errorMessage(response));
+    state.playlist = await response.json();
+    renderPlaylist(state.playlist);
+    const limit = state.playlist.limit;
+    setStatus(
+      state.playlist.entries.length >= limit ? `Only the first ${limit} videos are listed.` : "",
+    );
+  } catch (error) {
+    state.playlist = null;
+    els.playlistBox.hidden = true;
+    setStatus(error.message, "error");
+  } finally {
+    setBusy(false);
+    updatePlaylistSelection();
+  }
+}
+
+const STATE_TEXT = {
+  queued: "Waiting",
+  running: "Converting",
+  done: "Done",
+  failed: "Failed",
+  skipped: "Skipped",
+};
+
+function renderJob(job) {
+  const finished = job.status === "done" || job.status === "cancelled";
+  const handled = job.items.filter((item) => ["done", "failed", "skipped"].includes(item.status));
+  els.job.hidden = false;
+  els.jobBar.style.width = `${(handled.length / job.total) * 100}%`;
+
+  const failed = job.failed ? `, ${job.failed} failed` : "";
+  els.jobSummary.textContent = finished
+    ? `${job.status === "cancelled" ? "Stopped" : "Finished"}: ${job.done} of ${job.total} converted${failed}`
+    : `Converting ${handled.length + 1 > job.total ? job.total : handled.length + 1} of ${job.total}${failed}`;
+  els.jobCancel.hidden = finished;
+
+  els.jobItems.replaceChildren();
+  for (const item of job.items) {
+    const row = document.createElement("li");
+    row.className = `is-${item.status}`;
+    const stateLabel = document.createElement("span");
+    stateLabel.className = "state";
+    stateLabel.textContent = STATE_TEXT[item.status] || item.status;
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = item.filename || item.title;
+    if (item.error) {
+      const reason = document.createElement("small");
+      reason.textContent = item.error;
+      name.appendChild(reason);
+    }
+    row.append(stateLabel, name);
+    els.jobItems.appendChild(row);
+  }
+
+  els.jobActions.hidden = !(finished && (job.folder || job.zip_ready));
+  els.jobOpen.hidden = !job.folder;
+  els.jobZip.hidden = !job.zip_ready;
+  if (job.zip_ready) els.jobZip.href = `/api/jobs/${job.id}/zip`;
+}
+
+function stopPolling() {
+  clearInterval(state.poller);
+  state.poller = null;
+}
+
+async function pollJob() {
+  try {
+    const response = await fetch(`/api/jobs/${state.jobId}`);
+    if (!response.ok) throw new Error(await errorMessage(response));
+    const job = await response.json();
+    renderJob(job);
+    if (job.status === "done" || job.status === "cancelled") {
+      stopPolling();
+      setBusy(false);
+      updatePlaylistSelection();
+      if (job.folder) setStatus(`Saved to ${job.folder}`, "success");
+      else if (job.zip_ready) setStatus("Your ZIP is ready. Use Download ZIP.", "success");
+      else setStatus("No videos could be converted.", "error");
+    }
+  } catch (error) {
+    stopPolling();
+    setBusy(false);
+    setStatus(error.message || "Lost contact with the server.", "error");
+  }
+}
+
+async function startPlaylistJob() {
+  const entries = selectedEntries();
+  if (!state.playlist || entries.length === 0) throw new Error("Select at least one video.");
+  if (!els.optFolder.checked && !els.optZip.checked) {
+    throw new Error("Choose a folder, a ZIP, or both.");
+  }
+  const quality = els.qualityField.hidden ? "" : els.qualitySelect.value;
+  const response = await fetch("/api/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: state.playlist.title,
+      items: entries.map(({ title, url }) => ({ title, url })),
+      format: state.format,
+      quality: quality || null,
+      save_to_folder: els.optFolder.checked,
+      make_zip: els.optZip.checked,
+    }),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response));
+  const job = await response.json();
+  state.jobId = job.id;
+  renderJob(job);
+  stopPolling();
+  state.poller = setInterval(pollJob, 1500);
+}
+
+async function cancelJob() {
+  if (!state.jobId) return;
+  els.jobCancel.disabled = true;
+  try {
+    await fetch(`/api/jobs/${state.jobId}/cancel`, { method: "POST" });
+    setStatus("Stopping after the current video...");
+  } finally {
+    els.jobCancel.disabled = false;
+  }
+}
+
+async function openJobFolder() {
+  try {
+    const response = await fetch(`/api/jobs/${state.jobId}/open-folder`, { method: "POST" });
+    if (!response.ok) throw new Error(await errorMessage(response));
+  } catch (error) {
+    setStatus(error.message, "error");
+  }
+}
+
 /* ---------- convert ---------- */
 
 async function requestConversion() {
@@ -417,6 +667,20 @@ async function requestConversion() {
 async function onSubmit(event) {
   event.preventDefault();
   if (state.busy || !state.catalogue) return;
+
+  if (state.mode === "playlist") {
+    setBusy(true);
+    setStatus("");
+    els.submitBtn.textContent = "Working through the playlist...";
+    try {
+      await startPlaylistJob();
+    } catch (error) {
+      setBusy(false);
+      updatePlaylistSelection();
+      setStatus(error.message || "Something went wrong.", "error");
+    }
+    return;
+  }
 
   setBusy(true, { showProgress: true });
   setStatus("");
@@ -455,8 +719,24 @@ async function checkSetup() {
 
 els.tabUrl.addEventListener("click", () => selectTab("url"));
 els.tabFile.addEventListener("click", () => selectTab("file"));
-els.tabUrl.addEventListener("keydown", onTabKeys);
-els.tabFile.addEventListener("keydown", onTabKeys);
+els.tabPlaylist.addEventListener("click", () => selectTab("playlist"));
+for (const tab of [els.tabUrl, els.tabFile, els.tabPlaylist]) tab.addEventListener("keydown", onTabKeys);
+
+els.playlistLoad.addEventListener("click", loadPlaylist);
+els.playlistInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    loadPlaylist();
+  }
+});
+els.playlistAll.addEventListener("change", () => {
+  for (const box of els.playlistList.querySelectorAll("input")) box.checked = els.playlistAll.checked;
+  updatePlaylistSelection();
+});
+els.playlistList.addEventListener("change", updatePlaylistSelection);
+els.optFolder.addEventListener("change", updateFolderHint);
+els.jobCancel.addEventListener("click", cancelJob);
+els.jobOpen.addEventListener("click", openJobFolder);
 
 for (const input of els.kindInputs) {
   input.addEventListener("change", () => input.checked && state.catalogue && selectKind(input.value));

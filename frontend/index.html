@@ -37,7 +37,7 @@
   <main id="top">
     <section class="hero wrap">
       <h1>Convert a video link or file to the format you need</h1>
-      <p class="lead">MediaForge runs on your own computer. Paste a link or choose a file, pick a format, and download the result.</p>
+      <p class="lead">MediaForge runs on your own computer. Paste a link or a playlist, or choose a file, pick a format, and download the result.</p>
 
       <div id="banner" class="banner" role="alert" hidden></div>
 
@@ -45,6 +45,7 @@
         <div class="source-switch" role="tablist" aria-label="Input source">
           <button type="button" class="source-tab" role="tab" id="tab-url" aria-controls="panel-url" aria-selected="true">Link</button>
           <button type="button" class="source-tab" role="tab" id="tab-file" aria-controls="panel-file" aria-selected="false" tabindex="-1">File</button>
+          <button type="button" class="source-tab" role="tab" id="tab-playlist" aria-controls="panel-playlist" aria-selected="false" tabindex="-1">Playlist</button>
         </div>
 
         <section id="panel-url" class="panel" role="tabpanel" aria-labelledby="tab-url">
@@ -73,6 +74,31 @@
             <span id="dropzone-text" class="dropzone-text">Choose an audio or video file, or drop it here</span>
             <span id="dropzone-hint" class="dropzone-hint"></span>
           </label>
+        </section>
+
+        <section id="panel-playlist" class="panel" role="tabpanel" aria-labelledby="tab-playlist" hidden>
+          <label for="playlist-input" class="visually-hidden">Playlist link</label>
+          <div class="input-bar">
+            <svg class="input-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 12h11M4 17h7M19 8v9m0 0a2 2 0 1 1-2-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <input id="playlist-input" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a playlist link">
+            <button type="button" id="playlist-load" class="btn btn-quiet">Load playlist</button>
+          </div>
+          <div id="playlist-box" class="playlist-box" hidden>
+            <div class="playlist-head">
+              <div>
+                <p id="playlist-title" class="preview-title"></p>
+                <p id="playlist-count" class="preview-meta"></p>
+              </div>
+              <label class="check"><input type="checkbox" id="playlist-all" checked><span>Select all</span></label>
+            </div>
+            <ol id="playlist-list" class="playlist-list"></ol>
+            <fieldset class="group delivery">
+              <legend class="field-label">Where the files go</legend>
+              <label class="check"><input type="checkbox" id="opt-folder" checked><span>Save to a folder on this computer</span></label>
+              <label class="check"><input type="checkbox" id="opt-zip"><span>Make a ZIP to download</span></label>
+              <p id="folder-hint" class="hint"></p>
+            </fieldset>
+          </div>
         </section>
 
         <div class="choices">
@@ -110,6 +136,19 @@
           <p id="elapsed" class="elapsed"></p>
         </div>
 
+        <div id="job" class="job" hidden>
+          <div class="job-head">
+            <p id="job-summary" class="job-summary"></p>
+            <button type="button" id="job-cancel" class="btn btn-quiet">Cancel</button>
+          </div>
+          <div class="bar" aria-hidden="true"><span id="job-bar"></span></div>
+          <ol id="job-items" class="job-items"></ol>
+          <div id="job-actions" class="job-actions" hidden>
+            <button type="button" id="job-open" class="btn btn-quiet">Open folder</button>
+            <a id="job-zip" class="btn btn-quiet" href="#" hidden>Download ZIP</a>
+          </div>
+        </div>
+
         <p id="status" class="status" role="status" aria-live="polite"></p>
       </form>
     </section>
@@ -119,7 +158,7 @@
       <ol class="steps">
         <li>
           <h3>Choose what to convert</h3>
-          <p>Paste a link to a video, or pick an audio or video file from your computer.</p>
+          <p>Paste a link to a video or a whole playlist, or pick an audio or video file from your computer.</p>
         </li>
         <li>
           <h3>Pick a format</h3>

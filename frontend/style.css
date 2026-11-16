@@ -552,3 +552,54 @@ details p { max-width: 64ch; padding: 0 2px 20px; color: var(--muted); }
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+/* Playlist */
+.playlist-box { margin-top: 14px; }
+.playlist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.playlist-list {
+  max-height: 300px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.playlist-list li + li { border-top: 1px solid var(--line); }
+.playlist-list .check { padding: 9px 10px; }
+.pl-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-time { color: var(--muted); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+
+.check { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.check input { flex: none; width: 18px; height: 18px; accent-color: var(--accent); }
+.delivery { margin: 16px 0 0; padding: 0; border: 0; display: grid; gap: 10px; }
+.delivery .field-label { margin-bottom: 2px; }
+.hint { color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+
+/* Playlist progress */
+.job { margin-top: 20px; }
+.job-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.job-summary { font-weight: 650; font-family: var(--font-display); }
+.bar { height: 8px; margin-top: 10px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); border-radius: 99px; }
+.bar span { display: block; width: 0; height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.4s ease; }
+.job-items { max-height: 260px; margin: 12px 0 0; padding: 0; overflow-y: auto; list-style: none; font-size: 0.95rem; }
+.job-items li { display: flex; gap: 10px; padding: 6px 2px; border-top: 1px solid var(--line); }
+.job-items .state { flex: none; width: 5.5em; color: var(--muted); }
+.job-items .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.job-items li.is-done .state { color: var(--success); }
+.job-items li.is-failed .state, .job-items li.is-failed .name small { color: var(--danger); }
+.job-items li.is-running .state { color: var(--accent); }
+.job-items small { display: block; color: var(--muted); }
+.job-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+
+@media (max-width: 560px) {
+  .source-tab { padding: 8px 16px; }
+}
