@@ -28,6 +28,7 @@ const els = {
   specCodec: $("spec-codec"),
   specQuality: $("spec-quality"),
   specSize: $("spec-size"),
+  formatNote: $("format-note"),
   submitBtn: $("submit-btn"),
   progress: $("progress"),
   wave: $("wave"),
@@ -57,6 +58,22 @@ const FORMAT_INFO = {
   mp4: { label: "MP4", container: "MP4", codec: "Usually H.264 and AAC" },
   webm: { label: "WebM", container: "WebM", codec: "Usually VP9 and Opus" },
   mkv: { label: "MKV", container: "MKV", codec: "Usually H.264 and AAC" },
+  sony_mp4: {
+    label: "Sony car MP4",
+    container: "MP4",
+    codec: "MPEG-4 and AAC",
+    quality: "Up to 720 x 576, 30 fps",
+    size: "About 26 MB per minute",
+    note: "Made for the Sony XAV-W650BT. Older car units cannot play H.264 video.",
+  },
+  sony_avi: {
+    label: "Sony car AVI",
+    container: "AVI",
+    codec: "Xvid and MP3",
+    quality: "Up to 720 x 576, 30 fps",
+    size: "About 50 MB per minute",
+    note: "Also for the Sony XAV-W650BT. Try this one if the Sony car MP4 will not play.",
+  },
 };
 
 /* Rough video sizes per minute at each resolution. They vary a lot with the video. */
@@ -185,11 +202,15 @@ function isLossless() {
   return state.catalogue.lossless_audio.includes(state.format);
 }
 
+function isPreset() {
+  return state.catalogue.video.some((f) => f.id === state.format && f.preset);
+}
+
 function renderQualityOptions() {
   const c = state.catalogue;
   const isAudio = state.kind === "audio";
 
-  els.qualityField.hidden = isLossless();
+  els.qualityField.hidden = isLossless() || isPreset();
   els.qualitySelect.replaceChildren();
   els.qualityLabel.textContent = isAudio ? "Bitrate" : "Maximum resolution";
 
@@ -208,7 +229,10 @@ function renderSpec() {
   let qualityText;
   let sizeText;
 
-  if (state.kind === "audio") {
+  if (isPreset()) {
+    qualityText = info.quality;
+    sizeText = info.size;
+  } else if (state.kind === "audio") {
     if (isLossless()) {
       qualityText = "Lossless";
       sizeText = state.format === "wav" ? "About 10 MB per minute" : "About 5 to 7 MB per minute";
@@ -228,6 +252,8 @@ function renderSpec() {
   els.specCodec.textContent = info.codec;
   els.specQuality.textContent = qualityText;
   els.specSize.textContent = sizeText;
+  els.formatNote.textContent = info.note || "";
+  els.formatNote.hidden = !info.note;
 }
 
 function selectKind(kind) {

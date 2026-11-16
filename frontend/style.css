@@ -546,3 +546,9 @@ details p { max-width: 64ch; padding: 0 2px 20px; color: var(--muted); }
   .wave span { animation: none; transform: scaleY(0.7); }
   .chip span, summary::after { transition: none; }
 }
+
+.format-note {
+  margin: 12px 2px 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
