@@ -89,7 +89,7 @@ To check that FFmpeg and the JavaScript runtime were found, open <http://localho
 
 ## Usage
 
-1. Choose **From URL** or **From file**.
+1. Choose the **Link** or **File** tab.
 2. Enter a link (use **Preview** to check it first) or choose a file.
 3. Pick an output format and quality.
 4. Select **Convert and download**. Long videos and large files can take a few minutes.
@@ -149,7 +149,9 @@ mediaforge/
 ├── frontend/
 │   ├── index.html
 │   ├── style.css
-│   └── app.js
+│   ├── app.js
+│   ├── favicon.svg
+│   └── fonts/           # Archivo variable font (SIL OFL)
 ├── scripts/find-ffmpeg.ps1  # Windows helper: locate ffmpeg.exe
 ├── docs/screenshot.png
 ├── Dockerfile
