@@ -12,6 +12,9 @@ It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), 
 - Audio formats: MP3, M4A, AAC, WAV, FLAC, OGG, Opus, with selectable bitrate for lossy formats.
 - Video formats: MP4, WebM, MKV, with a maximum-resolution option (360p to 1080p, or best available).
 - Preview the title, uploader and duration of a URL before converting.
+- Convert a whole playlist: pick the videos you want, then save them to a folder on your computer, download a ZIP, or both.
+- Title, artist, album and cover art are written into the files (MP3, M4A, FLAC, Ogg, Opus, MP4, MKV). Playlist items get the playlist name as album and their position as track number.
+- Car presets for the Sony XAV-W650BT and similar older head units (see below).
 - Configurable limits for video length and upload size.
 - Temporary files are deleted after each download.
 - Light and dark theme, responsive layout.
@@ -89,10 +92,29 @@ To check that FFmpeg and the JavaScript runtime were found, open <http://localho
 
 ## Usage
 
-1. Choose the **Link** or **File** tab.
-2. Enter a link (use **Preview** to check it first) or choose a file.
+1. Choose the **Link**, **File** or **Playlist** tab.
+2. Enter a link (use **Preview** to check it first), choose a file, or paste a playlist link and select **Load playlist**.
 3. Pick an output format and quality.
 4. Select **Convert and download**. Long videos and large files can take a few minutes.
+
+### Playlists
+
+Paste a playlist link on the **Playlist** tab and select **Load playlist**. Untick any videos you do not want, choose where the files go, then start the job. Videos are converted one after another, and any that fail (private or removed videos, for example) are listed and skipped.
+
+- **Save to a folder on this computer** puts the files in `downloads/<playlist name>` inside the project folder (change it with `MEDIAFORGE_DOWNLOAD_DIR`). Files are named `01 - Title.mp3` so they play in playlist order. Copy the folder to a USB stick.
+- **Make a ZIP to download** builds a ZIP you can download when the job finishes.
+- Both can be on at the same time.
+
+### Older car head units (Sony XAV-W650BT)
+
+This Sony unit cannot play the H.264 video that normal MP4 files use. According to Sony's manual it plays only:
+
+| Container | Video | Audio | Limits |
+| --- | --- | --- | --- |
+| MP4 | MPEG-4 Simple Profile | AAC | 4 Mbps, 720 x 576, 30 fps |
+| AVI | Xvid (MPEG-4 ASP) | MP3 | 8 Mbps, 720 x 576, 30 fps |
+
+Choose **Video**, then **Sony car MP4** (about 3.3 Mbps video and 192 kbps AAC audio) or **Sony car AVI** (about 6.5 Mbps video and 192 kbps MP3 audio). Try the MP4 first and use the AVI if it will not play. Format the USB stick as FAT32. For music only, use MP3 at 192 kbps or lower, because Sony lists 48 to 192 kbps for MP3. These presets were checked with FFmpeg, not on a real head unit, and Sony says playback is not guaranteed.
 
 ## API
 
@@ -102,6 +124,12 @@ To check that FFmpeg and the JavaScript runtime were found, open <http://localho
 | GET | `/api/formats` | Supported formats, quality options and limits |
 | POST | `/api/info` | Body `{"url": "..."}`. Returns title, duration, uploader, thumbnail |
 | POST | `/api/convert` | Body `{"url": "...", "format": "mp3", "quality": "192"}`. Returns the converted file |
+| POST | `/api/playlist/info` | Body `{"url": "..."}`. Lists the videos in a playlist |
+| POST | `/api/jobs` | Starts a playlist job: `title`, `items` (`title`, `url`), `format`, `quality`, `save_to_folder`, `make_zip` |
+| GET | `/api/jobs/{id}` | Progress of a job, with the state of each video |
+| POST | `/api/jobs/{id}/cancel` | Stops after the current video |
+| GET | `/api/jobs/{id}/zip` | Downloads the job's ZIP |
+| POST | `/api/jobs/{id}/open-folder` | Opens the job's folder in the file manager |
 | POST | `/api/convert-file` | Multipart form with `file`, `format`, optional `quality`. Returns the converted file |
 
 Interactive API docs are available at <http://localhost:8000/docs> while the server is running.
@@ -116,6 +144,8 @@ Set these environment variables before starting the server (or in `docker-compos
 | --- | --- | --- |
 | `MEDIAFORGE_MAX_DURATION` | `3600` | Longest video accepted from a URL, in seconds |
 | `MEDIAFORGE_MAX_UPLOAD_MB` | `500` | Largest uploaded file, in megabytes |
+| `MEDIAFORGE_DOWNLOAD_DIR` | `../downloads` | Where playlist folders are saved |
+| `MEDIAFORGE_MAX_PLAYLIST_ITEMS` | `200` | Most videos accepted from one playlist |
 | `MEDIAFORGE_FRONTEND_DIR` | `../frontend` | Folder served as the web UI |
 | `MEDIAFORGE_FFMPEG_DIR` | (auto-detect) | Folder containing `ffmpeg`, for when it is installed but not on the `PATH` |
 
@@ -138,7 +168,8 @@ mediaforge/
 │   ├── app/
 │   │   ├── main.py          # FastAPI app and endpoints
 │   │   ├── downloader.py    # yt-dlp download and conversion
-│   │   ├── transcoder.py    # FFmpeg conversion for uploaded files
+│   │   ├── transcoder.py    # FFmpeg conversion for uploaded files and the car presets
+│   │   ├── jobs.py          # background playlist jobs
 │   │   ├── ffmpeg_locator.py # finds FFmpeg even when the PATH is stale
 │   │   ├── formats.py       # supported formats and quality options
 │   │   ├── validators.py    # URL and filename validation
