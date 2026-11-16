@@ -9,6 +9,7 @@ const els = {
   panelUrl: $("panel-url"),
   panelFile: $("panel-file"),
   urlInput: $("url-input"),
+  clearBtn: $("clear-btn"),
   previewBtn: $("preview-btn"),
   preview: $("preview"),
   previewThumb: $("preview-thumb"),
@@ -18,16 +19,53 @@ const els = {
   dropzone: $("dropzone"),
   dropzoneText: $("dropzone-text"),
   dropzoneHint: $("dropzone-hint"),
-  formatSelect: $("format-select"),
+  kindInputs: document.querySelectorAll('input[name="kind"]'),
+  chips: $("format-chips"),
   qualityField: $("quality-field"),
   qualityLabel: $("quality-label"),
   qualitySelect: $("quality-select"),
+  specContainer: $("spec-container"),
+  specCodec: $("spec-codec"),
+  specQuality: $("spec-quality"),
+  specSize: $("spec-size"),
   submitBtn: $("submit-btn"),
+  progress: $("progress"),
+  wave: $("wave"),
+  elapsed: $("elapsed"),
   status: $("status"),
   banner: $("banner"),
 };
 
-const state = { mode: "url", catalogue: null, busy: false };
+const state = {
+  mode: "url",
+  kind: "audio",
+  format: "mp3",
+  catalogue: null,
+  busy: false,
+  timer: null,
+};
+
+/* What each output format is made of, for the details panel. */
+const FORMAT_INFO = {
+  mp3: { label: "MP3", container: "MP3", codec: "MP3 (LAME)" },
+  m4a: { label: "M4A", container: "M4A", codec: "AAC" },
+  aac: { label: "AAC", container: "AAC stream", codec: "AAC" },
+  wav: { label: "WAV", container: "WAV", codec: "PCM, 16-bit" },
+  flac: { label: "FLAC", container: "FLAC", codec: "FLAC, lossless" },
+  ogg: { label: "OGG", container: "OGG", codec: "Vorbis" },
+  opus: { label: "Opus", container: "Opus", codec: "Opus" },
+  mp4: { label: "MP4", container: "MP4", codec: "Usually H.264 and AAC" },
+  webm: { label: "WebM", container: "WebM", codec: "Usually VP9 and Opus" },
+  mkv: { label: "MKV", container: "MKV", codec: "Usually H.264 and AAC" },
+};
+
+/* Rough video sizes per minute at each resolution. They vary a lot with the video. */
+const VIDEO_SIZE_PER_MINUTE = {
+  360: "3 to 6 MB",
+  480: "6 to 9 MB",
+  720: "15 to 25 MB",
+  1080: "30 to 50 MB",
+};
 
 /* ---------- helpers ---------- */
 
@@ -36,11 +74,18 @@ function setStatus(message, kind = "") {
   els.status.className = "status" + (kind ? ` is-${kind}` : "");
 }
 
+function formatClock(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
 function formatDuration(seconds) {
   if (!seconds) return "Unknown length";
   const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
+  const rest = seconds % 3600;
+  const m = Math.floor(rest / 60);
+  const s = Math.floor(rest % 60);
   const mmss = `${String(m).padStart(h ? 2 : 1, "0")}:${String(s).padStart(2, "0")}`;
   return h ? `${h}:${mmss}` : mmss;
 }
@@ -80,45 +125,117 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-function setBusy(busy) {
+/* ---------- busy state and waveform ---------- */
+
+function buildWave() {
+  const heights = [30, 55, 80, 45, 95, 60, 35, 75, 100, 50, 70, 40, 90, 65, 30, 85, 55, 100, 45, 75, 35, 60, 90, 50];
+  heights.forEach((height, index) => {
+    const bar = document.createElement("span");
+    bar.style.setProperty("--h", height);
+    bar.style.setProperty("--i", index);
+    els.wave.appendChild(bar);
+  });
+}
+
+function setBusy(busy, { showProgress = false } = {}) {
   state.busy = busy;
   els.submitBtn.disabled = busy;
   els.previewBtn.disabled = busy;
-  els.submitBtn.textContent = busy ? "Converting..." : "Convert and download";
-}
+  els.submitBtn.textContent = busy && showProgress ? "Converting..." : "Convert and download";
 
-/* ---------- formats and quality ---------- */
-
-function optionGroup(label, items) {
-  const group = document.createElement("optgroup");
-  group.label = label;
-  for (const item of items) {
-    const option = document.createElement("option");
-    option.value = item.id;
-    option.textContent = item.label;
-    group.appendChild(option);
+  clearInterval(state.timer);
+  els.progress.hidden = !(busy && showProgress);
+  if (busy && showProgress) {
+    const started = Date.now();
+    const tick = () => {
+      els.elapsed.textContent = `Working for ${formatClock((Date.now() - started) / 1000)}. Long videos can take a few minutes.`;
+    };
+    tick();
+    state.timer = setInterval(tick, 1000);
   }
-  return group;
 }
 
-function updateQualityOptions() {
+/* ---------- formats, quality and details panel ---------- */
+
+function formatsForKind(kind) {
+  return state.catalogue[kind].map((f) => f.id);
+}
+
+function renderChips() {
+  els.chips.replaceChildren();
+  for (const id of formatsForKind(state.kind)) {
+    const label = document.createElement("label");
+    label.className = "chip";
+
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "format";
+    input.value = id;
+    input.checked = id === state.format;
+
+    const text = document.createElement("span");
+    text.textContent = FORMAT_INFO[id]?.label || id.toUpperCase();
+
+    label.append(input, text);
+    els.chips.appendChild(label);
+  }
+}
+
+function isLossless() {
+  return state.catalogue.lossless_audio.includes(state.format);
+}
+
+function renderQualityOptions() {
   const c = state.catalogue;
-  const format = els.formatSelect.value;
-  const isAudio = c.audio.some((f) => f.id === format);
-  const isLossless = c.lossless_audio.includes(format);
+  const isAudio = state.kind === "audio";
 
-  els.qualityField.hidden = isLossless;
+  els.qualityField.hidden = isLossless();
   els.qualitySelect.replaceChildren();
-
-  const values = isAudio ? c.audio_bitrates : c.video_heights;
   els.qualityLabel.textContent = isAudio ? "Bitrate" : "Maximum resolution";
-  for (const value of values) {
+
+  for (const value of isAudio ? c.audio_bitrates : c.video_heights) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = isAudio ? `${value} kbps` : value === "best" ? "Best available" : `${value}p`;
     els.qualitySelect.appendChild(option);
   }
   els.qualitySelect.value = isAudio ? c.defaults.audio_bitrate : c.defaults.video_height;
+}
+
+function renderSpec() {
+  const info = FORMAT_INFO[state.format] || { container: state.format, codec: "" };
+  const quality = els.qualitySelect.value;
+  let qualityText;
+  let sizeText;
+
+  if (state.kind === "audio") {
+    if (isLossless()) {
+      qualityText = "Lossless";
+      sizeText = state.format === "wav" ? "About 10 MB per minute" : "About 5 to 7 MB per minute";
+    } else {
+      qualityText = `${quality} kbps`;
+      sizeText = `About ${((Number(quality) * 60) / 8 / 1000).toFixed(1)} MB per minute`;
+    }
+  } else if (quality === "best") {
+    qualityText = "Best available";
+    sizeText = "Depends on the video";
+  } else {
+    qualityText = `Up to ${quality}p`;
+    sizeText = `About ${VIDEO_SIZE_PER_MINUTE[quality]} per minute`;
+  }
+
+  els.specContainer.textContent = info.container;
+  els.specCodec.textContent = info.codec;
+  els.specQuality.textContent = qualityText;
+  els.specSize.textContent = sizeText;
+}
+
+function selectKind(kind) {
+  state.kind = kind;
+  state.format = kind === "audio" ? "mp3" : "mp4";
+  renderChips();
+  renderQualityOptions();
+  renderSpec();
 }
 
 async function loadFormats() {
@@ -131,15 +248,10 @@ async function loadFormats() {
     els.submitBtn.disabled = true;
     return;
   }
-  els.formatSelect.append(
-    optionGroup("Audio", state.catalogue.audio),
-    optionGroup("Video", state.catalogue.video),
-  );
-  els.formatSelect.value = "mp3";
-  updateQualityOptions();
+  selectKind("audio");
 }
 
-/* ---------- tabs ---------- */
+/* ---------- source tabs ---------- */
 
 function selectTab(mode) {
   state.mode = mode;
@@ -153,12 +265,31 @@ function selectTab(mode) {
   setStatus("");
 }
 
-/* ---------- URL preview ---------- */
+function onTabKeys(event) {
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  const next = state.mode === "url" ? "file" : "url";
+  selectTab(next);
+  (next === "url" ? els.tabUrl : els.tabFile).focus();
+}
+
+/* ---------- link preview ---------- */
+
+function updateClearButton() {
+  els.clearBtn.hidden = !els.urlInput.value;
+}
+
+function clearUrl() {
+  els.urlInput.value = "";
+  els.preview.hidden = true;
+  updateClearButton();
+  els.urlInput.focus();
+}
 
 async function previewUrl() {
   const url = els.urlInput.value.trim();
   if (!url) {
-    setStatus("Enter a URL first.", "error");
+    setStatus("Paste a video link first.", "error");
+    els.urlInput.focus();
     return;
   }
   setBusy(true);
@@ -175,7 +306,7 @@ async function previewUrl() {
     els.previewTitle.textContent = info.title;
     els.previewMeta.textContent = [info.uploader, formatDuration(info.duration)]
       .filter(Boolean)
-      .join(" - ");
+      .join(", ");
     if (info.thumbnail) {
       els.previewThumb.src = info.thumbnail;
       els.previewThumb.hidden = false;
@@ -197,7 +328,7 @@ async function previewUrl() {
 function showSelectedFile() {
   const file = els.fileInput.files[0];
   if (!file) {
-    els.dropzoneText.textContent = "Choose a file or drag it here";
+    els.dropzoneText.textContent = "Choose an audio or video file, or drop it here";
     els.dropzoneHint.textContent = "";
     return;
   }
@@ -231,12 +362,12 @@ function setupDropzone() {
 /* ---------- convert ---------- */
 
 async function requestConversion() {
-  const format = els.formatSelect.value;
+  const format = state.format;
   const quality = els.qualityField.hidden ? "" : els.qualitySelect.value;
 
   if (state.mode === "url") {
     const url = els.urlInput.value.trim();
-    if (!url) throw new Error("Enter a URL first.");
+    if (!url) throw new Error("Paste a video link first.");
     return fetch("/api/convert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -261,14 +392,14 @@ async function onSubmit(event) {
   event.preventDefault();
   if (state.busy || !state.catalogue) return;
 
-  setBusy(true);
-  setStatus("Converting. Long videos and large files can take a few minutes.");
+  setBusy(true, { showProgress: true });
+  setStatus("");
   try {
     const response = await requestConversion();
     if (!response.ok) throw new Error(await errorMessage(response));
 
     const blob = await response.blob();
-    const name = filenameFrom(response, `converted.${els.formatSelect.value}`);
+    const name = filenameFrom(response, `converted.${state.format}`);
     saveBlob(blob, name);
     setStatus(`Done: ${name} (${formatSize(blob.size)})`, "success");
   } catch (error) {
@@ -288,7 +419,7 @@ async function checkSetup() {
       els.banner.textContent =
         "FFmpeg was not found on this computer, so conversions will fail. " +
         "Install it (Windows: winget install Gyan.FFmpeg), open a new terminal, " +
-        "and restart MediaForge.";
+        "and restart MediaForge. The README has more help.";
       els.banner.hidden = false;
     }
   } catch (_) { /* loadFormats reports an unreachable server */ }
@@ -298,9 +429,26 @@ async function checkSetup() {
 
 els.tabUrl.addEventListener("click", () => selectTab("url"));
 els.tabFile.addEventListener("click", () => selectTab("file"));
-els.formatSelect.addEventListener("change", () => state.catalogue && updateQualityOptions());
+els.tabUrl.addEventListener("keydown", onTabKeys);
+els.tabFile.addEventListener("keydown", onTabKeys);
+
+for (const input of els.kindInputs) {
+  input.addEventListener("change", () => input.checked && state.catalogue && selectKind(input.value));
+}
+els.chips.addEventListener("change", (event) => {
+  if (event.target.name !== "format") return;
+  state.format = event.target.value;
+  renderQualityOptions();
+  renderSpec();
+});
+els.qualitySelect.addEventListener("change", renderSpec);
+
+els.urlInput.addEventListener("input", updateClearButton);
+els.clearBtn.addEventListener("click", clearUrl);
 els.previewBtn.addEventListener("click", previewUrl);
 els.form.addEventListener("submit", onSubmit);
+
+buildWave();
 setupDropzone();
 loadFormats();
 checkSetup();

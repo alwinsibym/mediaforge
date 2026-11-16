@@ -3,70 +3,192 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MediaForge</title>
-  <meta name="description" content="Convert video URLs and local files to MP3, WAV, MP4 and more. Runs on your own machine.">
+  <title>MediaForge | Video and audio converter</title>
+  <meta name="description" content="Convert a video link or a local file to MP3, WAV, MP4 and more. Runs on your own computer.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="container">
-    <header class="header">
-      <h1>MediaForge</h1>
-      <p class="subtitle">Convert a video link or a local file to the audio or video format you need. Everything runs on your own machine.</p>
-    </header>
+  <a class="skip-link" href="#convert-form">Skip to the converter</a>
 
-    <div id="banner" class="banner" role="alert" hidden></div>
-
-    <div class="tabs" role="tablist" aria-label="Input source">
-      <button type="button" class="tab" role="tab" id="tab-url" aria-controls="panel-url" aria-selected="true">From URL</button>
-      <button type="button" class="tab" role="tab" id="tab-file" aria-controls="panel-file" aria-selected="false" tabindex="-1">From file</button>
+  <header class="site-header">
+    <div class="wrap header-bar">
+      <a class="brand" href="#top" aria-label="MediaForge home">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" rx="9" class="mark-bg"/>
+          <rect x="6" y="13" width="3.4" height="6" rx="1.7" class="mark-bar"/>
+          <rect x="11.2" y="8" width="3.4" height="16" rx="1.7" class="mark-bar"/>
+          <rect x="16.4" y="11" width="3.4" height="10" rx="1.7" class="mark-bar"/>
+          <rect x="21.6" y="6" width="3.4" height="20" rx="1.7" class="mark-bar"/>
+        </svg>
+        <span>MediaForge</span>
+      </a>
+      <nav class="nav" aria-label="Page sections">
+        <a href="#how">How it works</a>
+        <a href="#formats">Formats</a>
+        <a href="#faq">FAQ</a>
+        <a class="nav-extra" href="https://github.com/alwinsibym/mediaforge" rel="noopener">GitHub</a>
+      </nav>
     </div>
+  </header>
 
-    <form id="convert-form" class="card" novalidate>
-      <section id="panel-url" class="panel" role="tabpanel" aria-labelledby="tab-url">
-        <label for="url-input" class="label">Video URL</label>
-        <div class="row">
-          <input id="url-input" name="url" type="url" inputmode="url" autocomplete="off"
-                 placeholder="https://www.youtube.com/watch?v=..." spellcheck="false">
-          <button type="button" id="preview-btn" class="btn btn-secondary">Preview</button>
+  <main id="top">
+    <section class="hero wrap">
+      <h1>Convert a video link or file to the format you need</h1>
+      <p class="lead">MediaForge runs on your own computer. Paste a link or choose a file, pick a format, and download the result.</p>
+
+      <div id="banner" class="banner" role="alert" hidden></div>
+
+      <form id="convert-form" class="converter" novalidate>
+        <div class="source-switch" role="tablist" aria-label="Input source">
+          <button type="button" class="source-tab" role="tab" id="tab-url" aria-controls="panel-url" aria-selected="true">Link</button>
+          <button type="button" class="source-tab" role="tab" id="tab-file" aria-controls="panel-file" aria-selected="false" tabindex="-1">File</button>
         </div>
-        <div id="preview" class="preview" hidden>
-          <img id="preview-thumb" alt="" width="120" height="68" hidden>
-          <div>
-            <p id="preview-title" class="preview-title"></p>
-            <p id="preview-meta" class="muted"></p>
+
+        <section id="panel-url" class="panel" role="tabpanel" aria-labelledby="tab-url">
+          <label for="url-input" class="visually-hidden">Video link</label>
+          <div class="input-bar">
+            <svg class="input-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.6 13.4a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M13.4 10.6a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <input id="url-input" name="url" type="url" inputmode="url" autocomplete="off" spellcheck="false" placeholder="Paste a video link">
+            <button type="button" id="clear-btn" class="icon-btn" aria-label="Clear the link" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button type="button" id="preview-btn" class="btn btn-quiet">Preview</button>
+          </div>
+          <div id="preview" class="preview" hidden>
+            <img id="preview-thumb" alt="" width="128" height="72" hidden>
+            <div class="preview-text">
+              <p id="preview-title" class="preview-title"></p>
+              <p id="preview-meta" class="preview-meta"></p>
+            </div>
+          </div>
+        </section>
+
+        <section id="panel-file" class="panel" role="tabpanel" aria-labelledby="tab-file" hidden>
+          <label id="dropzone" class="dropzone" for="file-input">
+            <input id="file-input" name="file" type="file" accept="audio/*,video/*">
+            <svg class="dropzone-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5m0 0l-4 4m4-4l4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="dropzone-text" class="dropzone-text">Choose an audio or video file, or drop it here</span>
+            <span id="dropzone-hint" class="dropzone-hint"></span>
+          </label>
+        </section>
+
+        <div class="choices">
+          <fieldset class="group">
+            <legend class="field-label">Type</legend>
+            <div class="segmented">
+              <label class="segment"><input type="radio" name="kind" value="audio" checked><span>Audio</span></label>
+              <label class="segment"><input type="radio" name="kind" value="video"><span>Video</span></label>
+            </div>
+          </fieldset>
+
+          <fieldset class="group group-formats">
+            <legend class="field-label">Format</legend>
+            <div id="format-chips" class="chips"></div>
+          </fieldset>
+
+          <div class="group group-quality" id="quality-field">
+            <label for="quality-select" class="field-label" id="quality-label">Bitrate</label>
+            <select id="quality-select" name="quality"></select>
           </div>
         </div>
-      </section>
 
-      <section id="panel-file" class="panel" role="tabpanel" aria-labelledby="tab-file" hidden>
-        <label for="file-input" class="label">Audio or video file</label>
-        <label id="dropzone" class="dropzone" for="file-input">
-          <input id="file-input" name="file" type="file" accept="audio/*,video/*">
-          <span id="dropzone-text">Choose a file or drag it here</span>
-          <span id="dropzone-hint" class="muted"></span>
-        </label>
-      </section>
+        <dl class="spec" aria-label="Output details">
+          <div class="spec-cell"><dt>Container</dt><dd id="spec-container">MP3</dd></div>
+          <div class="spec-cell"><dt>Codec</dt><dd id="spec-codec">MP3 (LAME)</dd></div>
+          <div class="spec-cell"><dt>Quality</dt><dd id="spec-quality">192 kbps</dd></div>
+          <div class="spec-cell"><dt>Typical size</dt><dd id="spec-size">About 1.4 MB per minute</dd></div>
+        </dl>
 
-      <div class="options">
-        <div class="field">
-          <label for="format-select" class="label">Output format</label>
-          <select id="format-select" name="format"></select>
+        <button type="submit" id="submit-btn" class="btn btn-primary">Convert and download</button>
+
+        <div id="progress" class="progress" hidden>
+          <div id="wave" class="wave" aria-hidden="true"></div>
+          <p id="elapsed" class="elapsed"></p>
         </div>
-        <div class="field" id="quality-field">
-          <label for="quality-select" class="label" id="quality-label">Quality</label>
-          <select id="quality-select" name="quality"></select>
-        </div>
+
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section id="how" class="section wrap">
+      <h2>How it works</h2>
+      <ol class="steps">
+        <li>
+          <h3>Choose what to convert</h3>
+          <p>Paste a link to a video, or pick an audio or video file from your computer.</p>
+        </li>
+        <li>
+          <h3>Pick a format</h3>
+          <p>Choose audio or video, then a format and quality. The details panel shows what you will get.</p>
+        </li>
+        <li>
+          <h3>Download the result</h3>
+          <p>Links are fetched with yt-dlp and converted with FFmpeg. Temporary files are deleted when the download finishes.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="formats" class="section wrap">
+      <h2>Formats</h2>
+      <p class="section-lead">Not sure which one to pick? MP3 for music on any device, MP4 for video that plays everywhere.</p>
+      <div class="table-wrap">
+        <table>
+          <caption class="visually-hidden">Supported output formats</caption>
+          <thead>
+            <tr><th scope="col">Format</th><th scope="col">Type</th><th scope="col">Good for</th></tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row">MP3</th><td>Audio</td><td>Music and podcasts on almost any device or player.</td></tr>
+            <tr><th scope="row">M4A</th><td>Audio</td><td>Better quality than MP3 at the same size. Works on Apple devices and most phones.</td></tr>
+            <tr><th scope="row">AAC</th><td>Audio</td><td>A raw AAC stream. Fewer players support it than M4A.</td></tr>
+            <tr><th scope="row">WAV</th><td>Audio</td><td>Uncompressed sound for editing. Files are large.</td></tr>
+            <tr><th scope="row">FLAC</th><td>Audio</td><td>Lossless sound at roughly half the size of WAV.</td></tr>
+            <tr><th scope="row">OGG</th><td>Audio</td><td>Open format used by games and many Linux players.</td></tr>
+            <tr><th scope="row">Opus</th><td>Audio</td><td>Efficient at low bitrates, so it suits speech.</td></tr>
+            <tr><th scope="row">MP4</th><td>Video</td><td>The safest choice. Plays on phones, TVs and browsers.</td></tr>
+            <tr><th scope="row">WebM</th><td>Video</td><td>Open format made for browsers. Conversion is slower.</td></tr>
+            <tr><th scope="row">MKV</th><td>Video</td><td>Flexible container for archiving. Some TVs cannot play it.</td></tr>
+          </tbody>
+        </table>
       </div>
+    </section>
 
-      <button type="submit" id="submit-btn" class="btn btn-primary">Convert and download</button>
-
-      <p id="status" class="status" role="status" aria-live="polite"></p>
-    </form>
-
-    <footer class="footer">
-      <p>For personal use with content you have the right to download. You are responsible for following the terms of the source site and applicable copyright law.</p>
-    </footer>
+    <section id="faq" class="section wrap">
+      <h2>Questions</h2>
+      <div class="faq">
+        <details>
+          <summary>Why does it say FFmpeg was not found?</summary>
+          <p>FFmpeg does the merging and converting, and it has to be installed on your computer. The README explains how to install it on Windows, macOS and Linux, and how to point MediaForge at it if it is installed but not detected.</p>
+        </details>
+        <details>
+          <summary>Which sites can I paste links from?</summary>
+          <p>Any site that yt-dlp supports. YouTube links also need a JavaScript runtime, which the setup installs for you.</p>
+        </details>
+        <details>
+          <summary>Are my files uploaded anywhere?</summary>
+          <p>No. Conversion happens on your own computer. Links are downloaded straight from the source site, and files you choose never leave your machine.</p>
+        </details>
+        <details>
+          <summary>Why is there a length limit?</summary>
+          <p>Videos longer than 60 minutes and uploads over 500 MB are refused by default, so one request cannot fill your disk. Both limits can be changed in the settings described in the README.</p>
+        </details>
+        <details>
+          <summary>What am I allowed to download?</summary>
+          <p>Use MediaForge for content you own or have permission to copy, such as your own uploads or Creative Commons work. Many sites restrict downloading in their terms, and copyright law applies.</p>
+        </details>
+      </div>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-bar">
+      <p>MediaForge is open source under the MIT licence. Built with FastAPI, yt-dlp and FFmpeg.</p>
+      <p><a href="https://github.com/alwinsibym/mediaforge" rel="noopener">View the source on GitHub</a></p>
+    </div>
+  </footer>
 
   <script src="app.js" defer></script>
 </body>
