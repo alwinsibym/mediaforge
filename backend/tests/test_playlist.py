@@ -228,3 +228,16 @@ def test_playlist_endpoints(client, fake_download, monkeypatch):
         == 400
     )
     assert Path(status["items"][0]["filename"]).suffix == ".mp3"
+
+
+def test_open_folder_is_refused_for_other_devices(fake_download):
+    from fastapi.testclient import TestClient
+
+    from app import main
+
+    job = jobs.start_job("Away", _items("https://e.com/a1"), "mp3", "192", True, False)
+    _wait(job.id)
+    remote = TestClient(main.app, client=("192.168.1.50", 5000))
+    response = remote.post(f"/api/jobs/{job.id}/open-folder")
+    assert response.status_code == 403
+    assert "computer running MediaForge" in response.json()["detail"]

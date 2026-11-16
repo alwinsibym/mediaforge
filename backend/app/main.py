@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import quote
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -257,8 +257,17 @@ def job_zip(job_id: str) -> FileResponse:
     return FileResponse(job.zip_path, filename=job.zip_path.name)
 
 
+_LOCAL_CLIENTS = {"127.0.0.1", "::1", "localhost", "testclient"}
+
+
 @app.post("/api/jobs/{job_id}/open-folder")
-def job_open_folder(job_id: str) -> dict:
+def job_open_folder(job_id: str, request: Request) -> dict:
+    # The folder opens on the computer running MediaForge, so only that computer may ask.
+    if request.client is None or request.client.host not in _LOCAL_CLIENTS:
+        raise HTTPException(
+            status_code=403,
+            detail="The folder can only be opened from the computer running MediaForge.",
+        )
     job = _find_job(job_id)
     try:
         jobs.open_folder(job)

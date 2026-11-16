@@ -728,9 +728,14 @@ function renderJob(job) {
   }
 
   els.jobActions.hidden = !(finished && (job.folder || job.zip_ready));
-  els.jobOpen.hidden = !job.folder;
+  els.jobOpen.hidden = !job.folder || !isThisComputer();
   els.jobZip.hidden = !job.zip_ready;
   if (job.zip_ready) els.jobZip.href = `/api/jobs/${job.id}/zip`;
+}
+
+/* The folder lives on the computer running MediaForge, which may not be this device. */
+function isThisComputer() {
+  return ["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
 }
 
 function stopPolling() {
@@ -748,7 +753,10 @@ async function pollJob() {
       stopPolling();
       setBusy(false);
       updatePlaylistSelection();
-      if (job.folder) setStatus(`Saved to ${job.folder}`, "success");
+      if (job.folder) {
+        const where = isThisComputer() ? "" : " (on the computer running MediaForge)";
+        setStatus(`Saved to ${job.folder}${where}`, "success");
+      }
       else if (job.zip_ready) setStatus("Your ZIP is ready. Use Download ZIP.", "success");
       else setStatus("No videos could be converted.", "error");
     }
