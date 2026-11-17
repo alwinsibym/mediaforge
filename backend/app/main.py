@@ -60,6 +60,8 @@ class JobRequest(BaseModel):
     mute: bool = False
     save_to_folder: bool = True
     make_zip: bool = False
+    # Keep the finished file for this browser to download (used for single links).
+    deliver_to_browser: bool = False
 
 
 def _bad_request(exc: Exception) -> HTTPException:
@@ -224,9 +226,35 @@ def create_job(body: JobRequest) -> dict:
             body.save_to_folder,
             body.make_zip,
             body.mute,
+            body.deliver_to_browser,
         )
     except ValueError as exc:
         raise _bad_request(exc) from exc
+    return jobs.snapshot(job)
+
+
+@app.post("/api/jobs/upload")
+async def create_upload_job(
+    file: UploadFile = File(...),
+    format: str = Form("mp3"),
+    quality: str | None = Form(None),
+    mute: bool = Form(False),
+) -> dict:
+    """Upload a file and convert it in the background, with live progress."""
+    try:
+        fmt, quality = formats.normalize(format, quality)
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+    job, destination = jobs.prepare_upload_job(file.filename or "upload", fmt, quality, mute)
+    try:
+        await _save_upload(file, destination)
+    except ConversionError as exc:
+        jobs.discard(job)
+        raise _bad_request(exc) from exc
+    except Exception:
+        jobs.discard(job)
+        raise HTTPException(status_code=500, detail="Unexpected server error.") from None
+    jobs.submit_upload(job)
     return jobs.snapshot(job)
 
 
@@ -247,6 +275,22 @@ def cancel_job(job_id: str) -> dict:
     job = _find_job(job_id)
     jobs.cancel_job(job)
     return jobs.snapshot(job)
+
+
+@app.get("/api/jobs/{job_id}/items/{index}/file")
+def job_item_file(job_id: str, index: int) -> FileResponse:
+    """Send a finished file to the browser, then delete it."""
+    job = _find_job(job_id)
+    item = next((item for item in job.items if item.index == index), None)
+    if item is None or not item.path or not item.path.exists():
+        raise HTTPException(status_code=404, detail="That file is not available any more.")
+    path = item.path
+
+    def forget() -> None:
+        path.unlink(missing_ok=True)
+        item.path = None
+
+    return FileResponse(path, filename=path.name, background=BackgroundTask(forget))
 
 
 @app.get("/api/jobs/{job_id}/zip")

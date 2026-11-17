@@ -1,6 +1,9 @@
 """Convert local audio/video files with FFmpeg."""
 
+import re
 import subprocess
+import tempfile
+import time
 from pathlib import Path
 
 from . import ffmpeg_locator, formats
@@ -82,8 +85,74 @@ def build_command(
     return command
 
 
-def convert_file(source: Path, fmt: str, quality: str, workdir: Path, mute: bool = False) -> Path:
-    """Convert `source` and return the path of the converted file."""
+_DURATION_RE = re.compile(r"Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)")
+
+
+def media_duration(path: Path) -> float | None:
+    """Length of a media file in seconds, read from FFmpeg's own report (no ffprobe needed)."""
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
+    try:
+        result = subprocess.run(
+            [ffmpeg, "-hide_banner", "-i", str(path)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    match = _DURATION_RE.search(result.stderr or "")
+    if not match:
+        return None
+    hours, minutes, seconds = match.groups()
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
+
+
+def _run_with_progress(command: list[str], duration: float | None, report) -> tuple[int, str]:
+    """Run FFmpeg and report how far along it is. Returns (exit code, error text)."""
+    command = [command[0], "-progress", "pipe:1", "-nostats", *command[1:]]
+    started = time.monotonic()
+    with tempfile.TemporaryFile("w+") as errors:
+        process = subprocess.Popen(  # noqa: S603
+            command, stdout=subprocess.PIPE, stderr=errors, text=True
+        )
+        try:
+            assert process.stdout is not None
+            for line in process.stdout:
+                if time.monotonic() - started > FFMPEG_TIMEOUT_SECONDS:
+                    raise ConversionError("The conversion took too long and was stopped.")
+                key, _, value = line.strip().partition("=")
+                if key not in ("out_time_us", "out_time_ms") or not value.lstrip("-").isdigit():
+                    continue
+                seconds = int(value) / 1_000_000
+                if duration and seconds > 0:
+                    percent = min(99.0, seconds / duration * 100)
+                    elapsed = time.monotonic() - started
+                    eta = elapsed / percent * (100 - percent) if percent > 1 else None
+                    report({"phase": "converting", "percent": percent, "speed": None, "eta": eta})
+                else:
+                    report({"phase": "converting", "percent": None})
+            process.wait(timeout=30)
+        except BaseException:
+            process.kill()
+            process.wait()
+            raise
+        errors.seek(0)
+        return process.returncode, errors.read()
+
+
+def convert_file(
+    source: Path,
+    fmt: str,
+    quality: str,
+    workdir: Path,
+    mute: bool = False,
+    progress=None,
+) -> Path:
+    """Convert `source` and return the path of the converted file.
+
+    `progress`, if given, receives dicts with phase, percent and eta while FFmpeg works. It may
+    raise `downloader.Cancelled` to stop the conversion.
+    """
     if not ffmpeg_available():
         raise ConversionError(FFMPEG_HELP)
 
@@ -92,18 +161,21 @@ def convert_file(source: Path, fmt: str, quality: str, workdir: Path, mute: bool
     if target == source:
         target = workdir / f"{source.stem}-converted.{ext}"
 
-    try:
-        result = subprocess.run(
-            build_command(source, target, fmt, quality, mute),
-            capture_output=True,
-            text=True,
-            timeout=FFMPEG_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ConversionError("The conversion took too long and was stopped.") from exc
+    command = build_command(source, target, fmt, quality, mute)
+    if progress is not None:
+        progress({"phase": "converting", "percent": 0})
+        code, error_text = _run_with_progress(command, media_duration(source), progress)
+    else:
+        try:
+            result = subprocess.run(
+                command, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ConversionError("The conversion took too long and was stopped.") from exc
+        code, error_text = result.returncode, result.stderr or ""
 
-    if result.returncode != 0 or not target.exists():
-        detail = (result.stderr or "").strip().splitlines()
+    if code != 0 or not target.exists():
+        detail = error_text.strip().splitlines()
         reason = detail[-1] if detail else "unknown error"
         raise ConversionError(f"FFmpeg could not convert this file: {reason[:200]}")
 

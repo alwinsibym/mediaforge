@@ -40,7 +40,7 @@ def test_lossless_audio_has_no_bitrate():
 
 
 def test_video_selector_caps_height():
-    assert "[height<=720]" in downloader._video_selector("mp4", "720")
+    assert "[height<=?720]" in downloader._video_selector("mp4", "720")
     assert "height" not in downloader._video_selector("mkv", "best")
 
 
@@ -64,7 +64,7 @@ def test_download_fails_early_without_ffmpeg(monkeypatch, tmp_path):
 
 def test_preset_downloads_small_and_merges_to_mkv():
     options = downloader._build_options("sony_mp4", "preset", Path("/tmp/x"))
-    assert "height<=576" in options["format"]
+    assert "height<=?576" in options["format"]
     assert options["merge_output_format"] == "mkv"
     assert "postprocessors" not in options or not any(
         pp.get("key") == "FFmpegVideoConvertor" for pp in options["postprocessors"]
@@ -87,7 +87,7 @@ def test_preset_output_is_reencoded_for_the_car(monkeypatch, tmp_path):
         def download(self, urls):
             (tmp_path / "Song.mkv").write_bytes(b"video")
 
-    def fake_convert(source, fmt, quality, workdir, mute=False):
+    def fake_convert(source, fmt, quality, workdir, mute=False, progress=None):
         calls["convert"] = (source.name, fmt, quality)
         target = workdir / "Song.mp4"
         target.write_bytes(b"car")

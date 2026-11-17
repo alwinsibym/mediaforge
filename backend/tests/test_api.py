@@ -46,7 +46,9 @@ def test_info_rejects_bad_url(client):
 def test_convert_url_streams_file_and_cleans_up(client, monkeypatch):
     workdirs = []
 
-    def fake_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
+    def fake_download(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None
+    ):
         workdirs.append(workdir)
         output = workdir / f"Demo.{fmt}"
         output.write_bytes(b"fake-audio")
@@ -64,7 +66,9 @@ def test_convert_url_streams_file_and_cleans_up(client, monkeypatch):
 def test_convert_url_reports_downloader_errors(client, monkeypatch):
     workdirs = []
 
-    def failing_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
+    def failing_download(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None
+    ):
         workdirs.append(workdir)
         raise ConversionError("This video is longer than the 60-minute limit.")
 
@@ -206,7 +210,9 @@ def test_sony_presets_produce_playable_files(
 def test_convert_url_passes_the_mute_option(client, monkeypatch):
     seen = {}
 
-    def fake_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False):
+    def fake_download(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None
+    ):
         seen.update(quality=quality, mute=mute)
         output = workdir / "Clip.mp4"
         output.write_bytes(b"v")

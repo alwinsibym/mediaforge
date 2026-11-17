@@ -14,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, downloader, validators
+from . import config, downloader, transcoder, validators
 from .downloader import ConversionError
 
 MAX_KEPT_JOBS = 10
@@ -32,6 +32,14 @@ class Item:
     status: str = "queued"  # queued, running, done, failed, skipped
     error: str | None = None
     filename: str | None = None
+    # Live progress of the step in progress.
+    phase: str | None = None
+    percent: float | None = None
+    speed: float | None = None  # bytes per second
+    eta: float | None = None  # seconds left
+    note: str | None = None
+    source: Path | None = None  # an uploaded file to convert instead of a link
+    path: Path | None = None  # the finished file, when it is kept for the browser
 
 
 @dataclass
@@ -45,6 +53,7 @@ class Job:
     make_zip: bool
     staging: Path
     mute: bool = False
+    browser_download: bool = False  # keep the file for the browser to download
     status: str = "queued"  # queued, running, done, cancelled
     folder: Path | None = None
     zip_path: Path | None = None
@@ -73,9 +82,10 @@ def start_job(
     save_to_folder: bool,
     make_zip: bool,
     mute: bool = False,
+    browser_download: bool = False,
 ) -> Job:
     """Validate a request, register the job and queue it."""
-    if not (save_to_folder or make_zip):
+    if not (save_to_folder or make_zip or browser_download):
         raise ValueError("Choose at least one way to receive the files: a folder or a ZIP.")
     if not items:
         raise ValueError("Select at least one video.")
@@ -100,7 +110,14 @@ def start_job(
         make_zip=make_zip,
         staging=Path(tempfile.mkdtemp(prefix="mediaforge-job-")),
         mute=mute,
+        browser_download=browser_download,
     )
+    _register(job)
+    _executor.submit(_run, job)
+    return job
+
+
+def _register(job: Job) -> None:
     with _lock:
         _jobs[job.id] = job
         while len(_jobs) > MAX_KEPT_JOBS:
@@ -111,8 +128,44 @@ def start_job(
                 _jobs[oldest.id] = oldest
                 _jobs.move_to_end(oldest.id, last=False)
                 break
+
+
+def prepare_upload_job(filename: str, fmt: str, quality: str, mute: bool) -> tuple[Job, Path]:
+    """Create a job for a file that is about to be uploaded. Returns it and where to save it.
+
+    Call `submit_upload` once the file is saved, or `discard` if the upload fails.
+    """
+    name = validators.safe_filename(filename, default="upload")
+    staging = Path(tempfile.mkdtemp(prefix="mediaforge-job-"))
+    destination = staging / "upload" / name
+    destination.parent.mkdir()
+    item = Item(index=1, title=name, url="", source=destination)
+    job = Job(
+        id=uuid.uuid4().hex[:12],
+        title=Path(name).stem,
+        fmt=fmt,
+        quality=quality,
+        items=[item],
+        save_to_folder=False,
+        make_zip=False,
+        staging=staging,
+        mute=mute,
+        browser_download=True,
+        status="uploading",
+    )
+    _register(job)
+    return job, destination
+
+
+def submit_upload(job: Job) -> None:
+    job.status = "queued"
     _executor.submit(_run, job)
-    return job
+
+
+def discard(job: Job) -> None:
+    with _lock:
+        _jobs.pop(job.id, None)
+    _forget(job)
 
 
 def get_job(job_id: str) -> Job | None:
@@ -122,6 +175,20 @@ def get_job(job_id: str) -> Job | None:
 
 def cancel_job(job: Job) -> None:
     job.cancel_requested = True
+
+
+def _reporter(job: Job, item: Item):
+    """A progress callback for one item. It also carries the Cancel request into the work."""
+
+    def report(update: dict) -> None:
+        if job.cancel_requested:
+            raise downloader.Cancelled()
+        item.phase = update.get("phase", item.phase)
+        item.percent = update.get("percent")
+        item.speed = update.get("speed")
+        item.eta = update.get("eta")
+
+    return report
 
 
 def snapshot(job: Job) -> dict:
@@ -146,6 +213,12 @@ def snapshot(job: Job) -> dict:
                 "status": item.status,
                 "error": item.error,
                 "filename": item.filename,
+                "phase": item.phase,
+                "percent": item.percent,
+                "speed": item.speed,
+                "eta": item.eta,
+                "note": item.note,
+                "downloadable": bool(item.path and item.path.exists()),
             }
             for item in job.items
         ],
@@ -166,30 +239,51 @@ def _destination_dir(job: Job) -> Path:
 def _run_item(job: Job, item: Item) -> None:
     workdir = job.staging / f"item-{item.index}"
     workdir.mkdir()
+    report = _reporter(job, item)
+    notes: list[str] = []
     try:
-        output = downloader.download_and_convert(
-            item.url,
-            job.fmt,
-            job.quality,
-            workdir,
-            {"album": job.title, "track": item.index},
-            mute=job.mute,
-        )
-        name = validators.safe_filename(f"{item.index:02d} - {output.stem}", max_length=120)
-        final = _destination_dir(job) / f"{name}{output.suffix}"
-        counter = 2
-        while final.exists():
-            final = final.with_name(f"{name} ({counter}){output.suffix}")
-            counter += 1
-        shutil.move(str(output), final)
-        job.produced.append(final)
-        item.filename = final.name
+        if item.source is not None:
+            output = transcoder.convert_file(
+                item.source, job.fmt, job.quality, workdir, job.mute, report
+            )
+        else:
+            output = downloader.download_and_convert(
+                item.url,
+                job.fmt,
+                job.quality,
+                workdir,
+                {"album": job.title, "track": item.index},
+                notes,
+                job.mute,
+                report,
+            )
+        item.note = " ".join(notes) or None
+        if job.browser_download:
+            kept = job.staging / "files"
+            kept.mkdir(exist_ok=True)
+            final = kept / output.name
+            shutil.move(str(output), final)
+            item.path = final
+            item.filename = final.name
+        else:
+            name = validators.safe_filename(f"{item.index:02d} - {output.stem}", max_length=120)
+            final = _destination_dir(job) / f"{name}{output.suffix}"
+            counter = 2
+            while final.exists():
+                final = final.with_name(f"{name} ({counter}){output.suffix}")
+                counter += 1
+            shutil.move(str(output), final)
+            job.produced.append(final)
+            item.filename = final.name
         item.status = "done"
+    except downloader.Cancelled:
+        item.status = "skipped"
     except ConversionError as exc:
         item.status, item.error = "failed", str(exc)
     except Exception:  # keep going with the rest of the playlist
         item.status, item.error = "failed", "Unexpected error while converting this video."
     finally:
+        item.phase = item.percent = item.speed = item.eta = None
         shutil.rmtree(workdir, ignore_errors=True)
 
 
@@ -216,7 +310,7 @@ def _run(job: Job) -> None:
             _make_zip(job)
         except OSError:
             job.zip_path = None
-    if not job.save_to_folder:
+    if not job.save_to_folder and not job.browser_download:
         # The files only existed to build the ZIP.
         shutil.rmtree(job.staging / "files", ignore_errors=True)
     job.status = "cancelled" if job.cancel_requested else "done"

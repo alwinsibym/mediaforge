@@ -6,6 +6,8 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+from collections.abc import Callable
 from pathlib import Path
 
 import yt_dlp
@@ -19,6 +21,28 @@ _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 class ConversionError(Exception):
     """A problem the user can understand (bad URL, too long, unsupported...)."""
+
+
+class Cancelled(Exception):
+    """The person stopped the job."""
+
+
+def _is_transient(message: str) -> bool:
+    """Errors that usually go away when the download is simply tried again."""
+    text = message.lower()
+    return any(
+        hint in text
+        for hint in ("403", "forbidden", "timed out", "timeout", "http error 5", "connection reset")
+    )
+
+
+def _friendly(message: str) -> str:
+    if "403" in message or "forbidden" in message.lower():
+        return (
+            "The site refused the download (HTTP 403) even after retrying. Try again in a "
+            'moment. If it keeps happening, update yt-dlp with: pip install -U "yt-dlp[default]"'
+        )
+    return message
 
 
 def _clean_error(exc: Exception) -> str:
@@ -66,6 +90,7 @@ def js_runtimes() -> dict:
 def _base_options() -> dict:
     options = {
         "quiet": True,
+        "noprogress": True,
         "no_warnings": True,
         "noplaylist": True,
         "socket_timeout": 30,
@@ -298,10 +323,10 @@ def _video_selector(fmt: str, quality: str, mute: bool = False) -> str:
     """Build the yt-dlp format selector for a video format and quality."""
     if formats.is_preset(fmt):
         # Car presets are re-encoded at 720x576 or less, so skip bigger downloads.
-        return "bestvideo[height<=576]+bestaudio/best[height<=576]/bestvideo+bestaudio/best"
+        return "bestvideo[height<=?576]+bestaudio/best[height<=?576]/bestvideo+bestaudio/best"
 
     height, fps = formats.parse_quality(quality)
-    cap = (f"[height<={height}]" if height else "") + (f"[fps<={fps}]" if fps else "")
+    cap = (f"[height<=?{height}]" if height else "") + (f"[fps<=?{fps}]" if fps else "")
     # H.264 plays on almost everything but YouTube stops offering it above 1080p.
     plays_everywhere = bool(height and height <= 1080)
 
@@ -384,6 +409,10 @@ def _build_options(
 ) -> dict:
     options = _base_options()
     options["outtmpl"] = str(workdir / "%(title).80s.%(ext)s")
+    # Network hiccups are common (YouTube sometimes answers 403 for a moment), so retry.
+    options["retries"] = 10
+    options["fragment_retries"] = 10
+    options["extractor_retries"] = 3
 
     if formats.is_audio(fmt):
         options["format"] = "bestaudio/best"
@@ -417,6 +446,56 @@ def _build_options(
     return options
 
 
+ProgressCallback = Callable[[dict], None]
+
+
+class _DownloadProgress:
+    """Turns yt-dlp's per-stream progress into one percent, speed and time-left figure."""
+
+    def __init__(self, callback: ProgressCallback) -> None:
+        self.callback = callback
+        self.finished_bytes = 0
+
+    def download_hook(self, data: dict) -> None:
+        try:
+            self._handle(data)
+        except Cancelled as exc:
+            raise yt_dlp.utils.DownloadCancelled("Cancelled") from exc
+
+    def _handle(self, data: dict) -> None:
+        status = data.get("status")
+        done = data.get("downloaded_bytes") or 0
+        if status == "finished":
+            self.finished_bytes += data.get("total_bytes") or done
+            return
+        if status != "downloading":
+            return
+
+        total = data.get("total_bytes") or data.get("total_bytes_estimate")
+        streams = (data.get("info_dict") or {}).get("requested_formats") or []
+        sizes = [f.get("filesize") or f.get("filesize_approx") for f in streams]
+        if streams and all(sizes):
+            # Video and audio arrive as separate files: count both toward one total.
+            grand_total, current = sum(sizes), self.finished_bytes + done
+        else:
+            grand_total, current = total, done
+
+        speed = data.get("speed")
+        percent = min(99.9, current / grand_total * 100) if grand_total else None
+        if speed and grand_total:
+            eta = max(0.0, (grand_total - current) / speed)
+        else:
+            eta = data.get("eta")
+        self.callback({"phase": "downloading", "percent": percent, "speed": speed, "eta": eta})
+
+    def processing_hook(self, data: dict) -> None:
+        if data.get("status") == "started":
+            try:
+                self.callback({"phase": "processing", "percent": None})
+            except Cancelled as exc:
+                raise yt_dlp.utils.DownloadCancelled("Cancelled") from exc
+
+
 def _find_output(workdir: Path, extension: str) -> Path:
     files = [
         p for p in workdir.iterdir() if p.is_file() and p.suffix not in {".part", ".ytdl", ".tmp"}
@@ -425,6 +504,15 @@ def _find_output(workdir: Path, extension: str) -> Path:
         raise ConversionError("Conversion finished but no file was produced.")
     preferred = [p for p in files if p.suffix.lower() == f".{extension}"]
     return max(preferred or files, key=lambda p: p.stat().st_size)
+
+
+DOWNLOAD_ATTEMPTS = 3
+
+
+def _discard_partial_files(workdir: Path) -> None:
+    for leftover in workdir.iterdir():
+        if leftover.is_file():
+            leftover.unlink(missing_ok=True)
 
 
 def _add_cover(output: Path, workdir: Path, notes: list[str] | None) -> None:
@@ -451,15 +539,19 @@ def download_and_convert(
     extra: dict | None = None,
     notes: list[str] | None = None,
     mute: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> Path:
     """Download `url`, convert it to `fmt`, and return the output file path.
 
     `extra` may carry {"album": playlist name, "track": position} for playlist items.
     Problems that do not stop the download (such as missing cover art) are added to `notes`.
+    `progress` receives dicts with phase, percent, speed and eta. It may raise `Cancelled`.
     """
+    report = progress or (lambda update: None)
     if not ffmpeg_ready():
         raise ConversionError(FFMPEG_HELP)
 
+    report({"phase": "looking up", "percent": None})
     info = fetch_info(url)
 
     if info["is_live"]:
@@ -470,17 +562,32 @@ def download_and_convert(
         raise ConversionError(f"This video is longer than the {limit_min}-minute limit.")
 
     options = _build_options(fmt, quality, workdir, extra, mute and formats.is_video(fmt))
-    try:
-        with yt_dlp.YoutubeDL(options) as ydl:
-            ydl.download([url])
-    except DownloadError as exc:
-        raise ConversionError(_clean_error(exc)) from exc
+    tracker = _DownloadProgress(report)
+    options["progress_hooks"] = [tracker.download_hook]
+    options["postprocessor_hooks"] = [tracker.processing_hook]
+
+    for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+        tracker.finished_bytes = 0
+        try:
+            with yt_dlp.YoutubeDL(options) as ydl:
+                ydl.download([url])
+            break
+        except yt_dlp.utils.DownloadCancelled as exc:
+            raise Cancelled() from exc
+        except DownloadError as exc:
+            message = _clean_error(exc)
+            if attempt < DOWNLOAD_ATTEMPTS and _is_transient(message):
+                report({"phase": "retrying", "percent": None})
+                _discard_partial_files(workdir)
+                time.sleep(2 * attempt)
+                continue
+            raise ConversionError(_friendly(message)) from exc
 
     if formats.is_preset(fmt):
         from . import transcoder  # imported here because transcoder imports this module
 
         downloaded = _find_output(workdir, "mkv")
-        output = transcoder.convert_file(downloaded, fmt, quality, workdir, mute)
+        output = transcoder.convert_file(downloaded, fmt, quality, workdir, mute, report)
         downloaded.unlink(missing_ok=True)
         return output
 
