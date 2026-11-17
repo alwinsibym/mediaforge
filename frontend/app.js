@@ -32,6 +32,41 @@ const els = {
   progressText: $("progress-text"),
   progressCancel: $("progress-cancel"),
   themeSwitch: $("theme-switch"),
+  jobRetry: $("job-retry"),
+  jobNotice: $("job-notice"),
+  extras: $("extras"),
+  extraNormalize: $("extra-normalize"),
+  optNormalize: $("opt-normalize"),
+  extraSponsor: $("extra-sponsor"),
+  optSponsor: $("opt-sponsor"),
+  extraSubs: $("extra-subs"),
+  optSubs: $("opt-subs"),
+  subsLangsField: $("subs-langs-field"),
+  subsLangs: $("subs-langs"),
+  extraTrim: $("extra-trim"),
+  trimStart: $("trim-start"),
+  trimEnd: $("trim-end"),
+  extraChapters: $("extra-chapters"),
+  optChapters: $("opt-chapters"),
+  historyBtn: $("history-btn"),
+  settingsBtn: $("settings-btn"),
+  settingsDialog: $("settings-dialog"),
+  settingsForm: $("settings-form"),
+  setBrowser: $("set-browser"),
+  setCookies: $("set-cookies"),
+  setParallel: $("set-parallel"),
+  setAria2c: $("set-aria2c"),
+  ariaHint: $("aria-hint"),
+  ytdlpVersion: $("ytdlp-version"),
+  ytdlpUpdate: $("ytdlp-update"),
+  ytdlpResult: $("ytdlp-result"),
+  settingsStatus: $("settings-status"),
+  settingsClose: $("settings-close"),
+  historyDialog: $("history-dialog"),
+  historyList: $("history-list"),
+  historyEmpty: $("history-empty"),
+  historyClear: $("history-clear"),
+  historyClose: $("history-close"),
   jobActions: $("job-actions"),
   jobOpen: $("job-open"),
   jobZip: $("job-zip"),
@@ -88,6 +123,8 @@ const state = {
   jobKind: "single",
   jobStarted: 0,
   upload: null,
+  failedItems: [],
+  lastBody: null,
 };
 
 const TABS = {
@@ -99,12 +136,12 @@ const TABS = {
 /* What each output format is made of, for the details panel. */
 const FORMAT_INFO = {
   mp3: { label: "MP3", container: "MP3", codec: "MP3 (LAME)" },
-  m4a: { label: "M4A", container: "M4A", codec: "AAC" },
+  m4a: { label: "M4A", container: "M4A", codec: "AAC (copied as is when possible)" },
   aac: { label: "AAC", container: "AAC stream", codec: "AAC" },
   wav: { label: "WAV", container: "WAV", codec: "PCM, 16-bit" },
   flac: { label: "FLAC", container: "FLAC", codec: "FLAC, lossless" },
   ogg: { label: "OGG", container: "OGG", codec: "Vorbis" },
-  opus: { label: "Opus", container: "Opus", codec: "Opus" },
+  opus: { label: "Opus", container: "Opus", codec: "Opus (copied as is when possible)" },
   mp4: { label: "MP4", container: "MP4", codec: "H.264 up to 1080p, VP9 above" },
   webm: { label: "WebM", container: "WebM", codec: "Usually VP9 and Opus" },
   mkv: { label: "MKV", container: "MKV", codec: "Usually H.264 and AAC" },
@@ -203,6 +240,7 @@ const PHASE_TEXT = {
   processing: "Processing",
   converting: "Converting",
   retrying: "The site hiccupped, trying again",
+  waiting: "The site asked for a sign-in check. Waiting before trying again",
 };
 
 /* One line such as "Downloading 42% - 3.2 MB/s - about 18 s left". */
@@ -416,12 +454,43 @@ function highResolutionNote() {
   return "Above 1080p, YouTube offers VP9 and AV1 video instead of H.264. MKV or WebM plays these most reliably, and MP4 may not play on older devices.";
 }
 
-function selectKind(kind) {
+function selectKind(kind, format) {
   state.kind = kind;
-  state.format = kind === "audio" ? "mp3" : "mp4";
+  state.format = format || (kind === "audio" ? "mp3" : "mp4");
+  for (const input of els.kindInputs) input.checked = input.value === kind;
   renderChips();
   renderQualityOptions();
   renderSpec();
+  updateExtras();
+}
+
+/* ---------- more options ---------- */
+
+/* Show only the extras that make sense for this tab and format. */
+function updateExtras() {
+  const link = state.mode === "url";
+  const video = state.kind === "video" && !isPreset();
+  els.extraSponsor.hidden = state.mode === "file";
+  els.extraSubs.hidden = !(video && state.mode !== "file");
+  els.subsLangsField.hidden = els.extraSubs.hidden || !els.optSubs.checked;
+  els.extraTrim.hidden = !link;
+  els.extraChapters.hidden = !link || (state.kind === "video" && isPreset());
+}
+
+/* What the person asked for in "More options", as the server expects it. */
+function collectOptions() {
+  const options = { normalize: els.optNormalize.checked };
+  if (!els.extraSponsor.hidden) options.sponsorblock = els.optSponsor.checked;
+  if (!els.extraSubs.hidden && els.optSubs.checked) {
+    options.subtitles = true;
+    options.subtitle_langs = els.subsLangs.value.trim() || "en";
+  }
+  if (!els.extraTrim.hidden) {
+    options.trim_start = els.trimStart.value.trim();
+    options.trim_end = els.trimEnd.value.trim();
+  }
+  if (!els.extraChapters.hidden) options.split_chapters = els.optChapters.checked;
+  return options;
 }
 
 async function loadFormats() {
@@ -454,6 +523,7 @@ function selectTab(mode) {
     renderQualityOptions();
     renderSpec();
   }
+  updateExtras();
   setStatus("");
 }
 
@@ -758,20 +828,44 @@ function renderJob(job) {
   const finished = job.status === "done" || job.status === "cancelled";
   const handled = job.items.filter((item) => ["done", "failed", "skipped"].includes(item.status));
   els.job.hidden = false;
-  const running = job.items.find((item) => item.status === "running");
-  const fraction = running && typeof running.percent === "number" ? running.percent / 100 : 0;
-  const overall = finished ? 1 : (handled.length + fraction) / job.total;
+  const active = job.items.filter((item) => item.status === "running");
+  const fraction = active.reduce(
+    (sum, item) => sum + (typeof item.percent === "number" ? item.percent / 100 : 0),
+    0,
+  );
+  const overall = finished ? 1 : Math.min(1, (handled.length + fraction) / job.total);
   els.jobBar.style.width = `${overall * 100}%`;
 
-  if (finished || !running) {
+  if (finished || active.length === 0) {
     els.jobDetail.textContent = "";
   } else {
-    const parts = [describeProgress(running)];
+    const parts = [];
+    if (active.length === 1) {
+      parts.push(describeProgress(active[0]));
+    } else {
+      const speed = active.reduce((sum, item) => sum + (item.speed || 0), 0);
+      parts.push(`${active.length} at a time`, formatSpeed(speed));
+    }
     const elapsed = (Date.now() - state.jobStarted) / 1000;
     if (handled.length >= 1 && overall > 0) {
-      parts.push(`${formatTimeLeft((elapsed / overall) * (1 - overall)).replace(" left", " left overall")}`);
+      parts.push(formatTimeLeft((elapsed / overall) * (1 - overall)).replace(" left", " left overall"));
     }
     els.jobDetail.textContent = parts.filter(Boolean).join(" \u00b7 ");
+  }
+
+  state.failedItems = finished
+    ? job.items
+        .filter((item) => ["failed", "skipped"].includes(item.status) && item.url)
+        .map((item) => ({ title: item.title, url: item.url, number: item.number }))
+    : [];
+  els.jobRetry.hidden = state.failedItems.length === 0;
+  els.jobRetry.textContent = `Retry ${state.failedItems.length}`;
+  els.jobNotice.hidden = !(finished && job.blocked);
+  if (job.blocked) {
+    els.jobNotice.textContent =
+      "The site kept asking for a sign-in check, so MediaForge stopped before it got worse. " +
+      "Open Settings and choose the browser where you are signed in, wait a few minutes, " +
+      "then choose Retry. The videos already saved are kept.";
   }
 
   const failed = job.failed ? `, ${job.failed} failed` : "";
@@ -786,10 +880,10 @@ function renderJob(job) {
     row.className = `is-${item.status}`;
     const stateLabel = document.createElement("span");
     stateLabel.className = "state";
-    stateLabel.textContent =
-      item.status === "running" && typeof item.percent === "number"
-        ? `${Math.floor(item.percent)}%`
-        : STATE_TEXT[item.status] || item.status;
+    if (item.status === "running" && item.phase === "waiting") stateLabel.textContent = "Paused";
+    else if (item.status === "running" && typeof item.percent === "number") {
+      stateLabel.textContent = `${Math.floor(item.percent)}%`;
+    } else stateLabel.textContent = STATE_TEXT[item.status] || item.status;
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = item.filename || item.title;
@@ -847,34 +941,56 @@ async function pollJob() {
   }
 }
 
-async function startPlaylistJob() {
-  const entries = selectedEntries();
-  if (!state.playlist || entries.length === 0) throw new Error("Select at least one video.");
-  if (!els.optFolder.checked && !els.optZip.checked) {
-    throw new Error("Choose a folder, a ZIP, or both.");
-  }
-  const quality = els.qualityField.hidden ? "" : els.qualitySelect.value;
-  const response = await fetch("/api/jobs", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
+async function startPlaylistJob({ retry = false } = {}) {
+  let body;
+  if (retry) {
+    if (!state.lastBody || state.failedItems.length === 0) throw new Error("Nothing to retry.");
+    body = { ...state.lastBody, items: state.failedItems, continue_job: state.jobId };
+  } else {
+    const entries = selectedEntries();
+    if (!state.playlist || entries.length === 0) throw new Error("Select at least one video.");
+    if (!els.optFolder.checked && !els.optZip.checked) {
+      throw new Error("Choose a folder, a ZIP, or both.");
+    }
+    body = {
       title: state.playlist.title,
       items: entries.map(({ title, url }) => ({ title, url })),
       format: state.format,
-      quality: quality || null,
+      quality: currentQuality() || null,
       mute: isMuted(),
       save_to_folder: els.optFolder.checked,
       make_zip: els.optZip.checked,
-    }),
+      options: collectOptions(),
+    };
+  }
+  const response = await fetch("/api/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error(await errorMessage(response));
   const job = await response.json();
+  state.lastBody = { ...body, continue_job: undefined };
   state.jobId = job.id;
   state.jobKind = "playlist";
   state.jobStarted = Date.now();
   renderJob(job);
   stopPolling();
   state.poller = setInterval(pollJob, 1000);
+}
+
+async function retryFailed() {
+  if (state.busy) return;
+  setBusy(true);
+  setStatus("");
+  els.submitBtn.textContent = "Working through the playlist...";
+  try {
+    await startPlaylistJob({ retry: true });
+  } catch (error) {
+    setBusy(false);
+    updatePlaylistSelection();
+    setStatus(error.message || "Something went wrong.", "error");
+  }
 }
 
 async function cancelJob() {
@@ -920,6 +1036,7 @@ async function startLinkJob() {
       save_to_folder: false,
       make_zip: false,
       deliver_to_browser: true,
+      options: collectOptions(),
     }),
   });
   if (!response.ok) throw new Error(await errorMessage(response));
@@ -939,6 +1056,7 @@ function startFileJob() {
   data.append("format", state.format);
   if (currentQuality()) data.append("quality", currentQuality());
   data.append("mute", String(isMuted()));
+  data.append("normalize", String(els.optNormalize.checked));
 
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -1096,6 +1214,164 @@ function chooseTheme(choice) {
   } catch (_) { /* the choice just will not be remembered */ }
 }
 
+/* ---------- settings and history (this computer only) ---------- */
+
+function fillSelect(select, options, selected) {
+  select.replaceChildren();
+  for (const [value, label] of options) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    option.selected = String(value) === String(selected);
+    select.appendChild(option);
+  }
+}
+
+async function openSettings() {
+  els.settingsStatus.textContent = "";
+  els.ytdlpResult.textContent = "";
+  try {
+    const [settingsResponse, healthResponse] = await Promise.all([
+      fetch("/api/settings"),
+      fetch("/api/health"),
+    ]);
+    if (!settingsResponse.ok) throw new Error(await errorMessage(settingsResponse));
+    const saved = await settingsResponse.json();
+    const health = await healthResponse.json();
+
+    fillSelect(
+      els.setBrowser,
+      [["", "Nothing"], ...saved.cookie_browsers.map((name) => [name, name[0].toUpperCase() + name.slice(1)])],
+      saved.cookies_browser,
+    );
+    els.setCookies.value = saved.cookies_file;
+    const counts = Array.from({ length: saved.max_parallel }, (_, i) => [i + 1, String(i + 1)]);
+    fillSelect(els.setParallel, counts, saved.parallel);
+    els.setAria2c.checked = saved.aria2c && saved.aria2c_installed;
+    els.setAria2c.disabled = !saved.aria2c_installed;
+    els.ariaHint.textContent = saved.aria2c_installed
+      ? "aria2c was found. The progress bar cannot show a percentage while it is used."
+      : "aria2c is not installed. On Windows: winget install aria2.aria2, then open this window again.";
+    els.ytdlpVersion.textContent = health.yt_dlp ? `Installed: yt-dlp ${health.yt_dlp}.` : "";
+    els.settingsDialog.showModal();
+  } catch (error) {
+    setStatus(error.message || "Settings could not be opened.", "error");
+  }
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  els.settingsStatus.className = "status";
+  els.settingsStatus.textContent = "";
+  try {
+    const response = await fetch("/api/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        cookies_browser: els.setBrowser.value,
+        cookies_file: els.setCookies.value.trim(),
+        parallel: Number(els.setParallel.value),
+        aria2c: els.setAria2c.checked,
+      }),
+    });
+    if (!response.ok) throw new Error(await errorMessage(response));
+    els.settingsDialog.close();
+    setStatus("Settings saved.", "success");
+  } catch (error) {
+    els.settingsStatus.className = "status is-error";
+    els.settingsStatus.textContent = error.message || "The settings could not be saved.";
+  }
+}
+
+async function updateYtdlp() {
+  els.ytdlpUpdate.disabled = true;
+  els.ytdlpResult.textContent = "Updating. This can take a minute...";
+  try {
+    const response = await fetch("/api/update-ytdlp", { method: "POST" });
+    if (!response.ok) throw new Error(await errorMessage(response));
+    const result = await response.json();
+    els.ytdlpResult.textContent = result.changed
+      ? `Updated from ${result.before} to ${result.after}. Close MediaForge and start it again to use the new version.`
+      : `Already up to date (${result.after}).`;
+    els.ytdlpVersion.textContent = `Installed: yt-dlp ${result.after}.`;
+  } catch (error) {
+    els.ytdlpResult.textContent = error.message || "The update failed.";
+  } finally {
+    els.ytdlpUpdate.disabled = false;
+  }
+}
+
+function useAgain(entry) {
+  els.historyDialog.close();
+  selectTab("url");
+  const kind = state.catalogue.audio.some((f) => f.id === entry.format) ? "audio" : "video";
+  selectKind(kind, entry.format);
+  if ([...els.qualitySelect.options].some((o) => o.value === entry.quality)) {
+    els.qualitySelect.value = entry.quality;
+    renderSpec();
+  }
+  els.urlInput.value = entry.url;
+  updateClearButton();
+  previewUrl();
+}
+
+async function openHistory() {
+  try {
+    const response = await fetch("/api/history");
+    if (!response.ok) throw new Error(await errorMessage(response));
+    renderHistory((await response.json()).items);
+    els.historyDialog.showModal();
+  } catch (error) {
+    setStatus(error.message || "History could not be opened.", "error");
+  }
+}
+
+function renderHistory(items) {
+  els.historyList.replaceChildren();
+  els.historyEmpty.hidden = items.length > 0;
+  els.historyClear.hidden = items.length === 0;
+  for (const entry of items) {
+    const row = document.createElement("li");
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = entry.title;
+    const meta = document.createElement("small");
+    const label = FORMAT_INFO[entry.format]?.label || entry.format.toUpperCase();
+    meta.textContent = `${label} \u00b7 ${new Date(entry.when * 1000).toLocaleString()}`;
+    name.appendChild(meta);
+    const again = document.createElement("button");
+    again.type = "button";
+    again.className = "btn btn-quiet";
+    again.textContent = "Use again";
+    again.addEventListener("click", () => useAgain(entry));
+    row.append(name, again);
+    els.historyList.appendChild(row);
+  }
+}
+
+async function clearHistory() {
+  const response = await fetch("/api/history", { method: "DELETE" });
+  if (response.ok) renderHistory([]);
+}
+
+/* Settings and history belong to the person at the computer running MediaForge. */
+async function revealLocalTools() {
+  try {
+    const response = await fetch("/api/settings");
+    if (!response.ok) return;
+  } catch (_) {
+    return;
+  }
+  els.historyBtn.hidden = false;
+  els.settingsBtn.hidden = false;
+}
+
+function closeOnBackdrop(dialog) {
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+}
+
 /* ---------- setup check ---------- */
 
 async function checkSetup() {
@@ -1133,6 +1409,16 @@ els.playlistAll.addEventListener("change", () => {
 els.playlistList.addEventListener("change", updatePlaylistSelection);
 els.optFolder.addEventListener("change", updateFolderHint);
 els.jobCancel.addEventListener("click", cancelJob);
+els.jobRetry.addEventListener("click", retryFailed);
+els.settingsBtn.addEventListener("click", openSettings);
+els.historyBtn.addEventListener("click", openHistory);
+els.settingsForm.addEventListener("submit", saveSettings);
+els.settingsClose.addEventListener("click", () => els.settingsDialog.close());
+els.ytdlpUpdate.addEventListener("click", updateYtdlp);
+els.historyClose.addEventListener("click", () => els.historyDialog.close());
+els.historyClear.addEventListener("click", clearHistory);
+closeOnBackdrop(els.settingsDialog);
+closeOnBackdrop(els.historyDialog);
 els.progressCancel.addEventListener("click", cancelSingleJob);
 applyTheme(savedTheme());
 els.themeSwitch.addEventListener("click", (event) => {
@@ -1149,8 +1435,10 @@ els.chips.addEventListener("change", (event) => {
   state.format = event.target.value;
   renderQualityOptions();
   renderSpec();
+  updateExtras();
 });
 els.qualitySelect.addEventListener("change", renderSpec);
+els.optSubs.addEventListener("change", updateExtras);
 
 els.urlInput.addEventListener("input", onUrlInput);
 els.urlInput.addEventListener("keydown", (event) => {
@@ -1170,3 +1458,4 @@ buildWave();
 setupDropzone();
 loadFormats();
 checkSetup();
+revealLocalTools();

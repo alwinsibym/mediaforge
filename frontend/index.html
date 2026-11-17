@@ -55,6 +55,12 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         </button>
       </div>
+      <button type="button" class="tool-btn" id="history-btn" aria-label="History" title="History" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button type="button" class="tool-btn" id="settings-btn" aria-label="Settings" title="Settings" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
     </div>
   </header>
 
@@ -174,6 +180,27 @@
         </dl>
         <p id="format-note" class="format-note" hidden></p>
 
+        <details id="extras" class="extras">
+          <summary>More options</summary>
+          <div class="extras-body">
+            <label class="check" id="extra-normalize"><input type="checkbox" id="opt-normalize"><span>Even out the volume <small>so songs from different videos play at the same loudness</small></span></label>
+            <label class="check" id="extra-sponsor" hidden><input type="checkbox" id="opt-sponsor"><span>Skip sponsor and self-promotion parts <small>YouTube only</small></span></label>
+            <div id="extra-subs" hidden>
+              <label class="check"><input type="checkbox" id="opt-subs"><span>Add subtitles <small>built into the video</small></span></label>
+              <div class="mini-field subs-langs" id="subs-langs-field" hidden>
+                <label for="subs-langs">Languages</label>
+                <input id="subs-langs" type="text" value="en" autocomplete="off" spellcheck="false" maxlength="40">
+              </div>
+            </div>
+            <div id="extra-trim" class="trim-row" hidden>
+              <div class="mini-field"><label for="trim-start">Start at</label><input id="trim-start" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off" maxlength="9"></div>
+              <div class="mini-field"><label for="trim-end">Stop at</label><input id="trim-end" type="text" inputmode="numeric" placeholder="end of video" autocomplete="off" maxlength="9"></div>
+              <p class="hint">Download only part of the video, for example 1:20 to 3:45.</p>
+            </div>
+            <label class="check" id="extra-chapters" hidden><input type="checkbox" id="opt-chapters"><span>Split into one file per chapter <small>you get a ZIP</small></span></label>
+          </div>
+        </details>
+
         <button type="submit" id="submit-btn" class="btn btn-primary">Convert and download</button>
 
         <div id="progress" class="progress" hidden>
@@ -193,9 +220,11 @@
           <div class="job-head">
             <p id="job-summary" class="job-summary"></p>
             <button type="button" id="job-cancel" class="btn btn-quiet">Cancel</button>
+            <button type="button" id="job-retry" class="btn btn-quiet" hidden>Retry</button>
           </div>
           <div class="bar" aria-hidden="true"><span id="job-bar"></span></div>
           <p id="job-detail" class="job-detail"></p>
+          <p id="job-notice" class="job-notice" role="alert" hidden></p>
           <ol id="job-items" class="job-items"></ol>
           <div id="job-actions" class="job-actions" hidden>
             <button type="button" id="job-open" class="btn btn-quiet">Open folder</button>
@@ -283,6 +312,56 @@
       <p><a href="https://github.com/alwinsibym/mediaforge" rel="noopener">View the source on GitHub</a></p>
     </div>
   </footer>
+
+  <dialog id="settings-dialog" class="dialog" aria-labelledby="settings-title">
+    <form id="settings-form" class="dialog-body">
+      <h2 id="settings-title">Settings</h2>
+
+      <section class="dialog-section">
+        <h3>Sites that need you signed in</h3>
+        <p class="hint">YouTube sometimes asks to confirm you are not a bot, and sites such as Reddit hide some videos from visitors. MediaForge can use the sign-in from a browser on this computer. It stays on this computer.</p>
+        <div class="mini-field"><label for="set-browser">Use the sign-in from</label>
+          <select id="set-browser"><option value="">Nothing</option></select></div>
+        <div class="mini-field"><label for="set-cookies">Or a cookies.txt file</label>
+          <input id="set-cookies" type="text" autocomplete="off" spellcheck="false" placeholder="C:\path\to\cookies.txt"></div>
+        <p class="hint">Firefox works most reliably. With Chrome or Edge, close the browser first, as recent versions can block this. A spare account is safer, because sites may limit accounts that download a lot.</p>
+      </section>
+
+      <section class="dialog-section">
+        <h3>Speed</h3>
+        <div class="mini-field"><label for="set-parallel">Playlist videos at the same time</label>
+          <select id="set-parallel"></select></div>
+        <p class="hint">Two is a good start. Choose 1 if YouTube keeps asking for a sign-in check.</p>
+        <label class="check"><input type="checkbox" id="set-aria2c"><span>Use aria2c for more connections per file</span></label>
+        <p id="aria-hint" class="hint"></p>
+      </section>
+
+      <section class="dialog-section">
+        <h3>Keep downloads working</h3>
+        <p class="hint">Sites change often, and yt-dlp is the part that keeps up with them. <span id="ytdlp-version"></span></p>
+        <button type="button" id="ytdlp-update" class="btn btn-quiet">Update yt-dlp</button>
+        <p id="ytdlp-result" class="hint" role="status"></p>
+      </section>
+
+      <p id="settings-status" class="status" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button type="button" id="settings-close" class="btn btn-quiet">Close</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="history-dialog" class="dialog" aria-labelledby="history-title">
+    <div class="dialog-body">
+      <h2 id="history-title">History</h2>
+      <p id="history-empty" class="hint" hidden>Finished downloads will appear here, so you can do one again.</p>
+      <ol id="history-list" class="history-list"></ol>
+      <div class="dialog-actions">
+        <button type="button" id="history-clear" class="btn btn-quiet">Clear history</button>
+        <button type="button" id="history-close" class="btn btn-primary">Close</button>
+      </div>
+    </div>
+  </dialog>
 
   <script src="app.js" defer></script>
 </body>
