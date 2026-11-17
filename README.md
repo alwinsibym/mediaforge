@@ -21,7 +21,9 @@ It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), 
 - Download the thumbnail in any size the site offers, as JPG, PNG or WebP, optionally cropped to a square.
 - Video without sound (any quality), and square cover art that car units and Windows can show on MP3 and M4A files.
 - Works on phones and tablets too: see "Using it from other devices".
-- Light and dark theme, responsive layout.
+- Live progress for every download: percent, speed and time left, with a Cancel button. Failed downloads caused by a passing site error are retried automatically.
+- Dark, Light or System theme (the default follows your device), chosen with the toggle in the header and remembered in your browser.
+- Responsive layout.
 
 ## How it works
 
@@ -232,6 +234,8 @@ mediaforge/
 **YouTube downloads fail or report missing formats.** yt-dlp needs a JavaScript runtime. Check `js_runtimes` on the health page. If it is empty, install Deno (`pip install deno`) or Node.js 20+.
 
 **Downloads that worked stop working.** Sites change often. Update yt-dlp with `pip install -U "yt-dlp[default]"` (or rebuild the Docker image with `docker compose build --no-cache`).
+
+**"HTTP Error 403: Forbidden" during a download.** The site refused one request. MediaForge retries up to three times and only then shows an error. If it keeps happening, update yt-dlp (see above).
 
 **"Sign in to confirm you're not a bot".** Some networks and IP addresses are challenged by YouTube. This is more common from cloud servers than from a home connection. Running MediaForge locally usually avoids it.
 

@@ -25,6 +25,13 @@ const els = {
   jobCancel: $("job-cancel"),
   jobBar: $("job-bar"),
   jobItems: $("job-items"),
+  jobDetail: $("job-detail"),
+  meter: $("meter"),
+  meterFill: $("meter-fill"),
+  meterPercent: $("meter-percent"),
+  progressText: $("progress-text"),
+  progressCancel: $("progress-cancel"),
+  themeSwitch: $("theme-switch"),
   jobActions: $("job-actions"),
   jobOpen: $("job-open"),
   jobZip: $("job-zip"),
@@ -78,6 +85,9 @@ const state = {
   info: null,
   previewedUrl: "",
   previewTimer: null,
+  jobKind: "single",
+  jobStarted: 0,
+  upload: null,
 };
 
 const TABS = {
@@ -167,6 +177,52 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatSpeed(bytesPerSecond) {
+  if (!bytesPerSecond) return "";
+  if (bytesPerSecond < 1024 * 1024) return `${Math.max(1, Math.round(bytesPerSecond / 1024))} KB/s`;
+  return `${(bytesPerSecond / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+
+function formatTimeLeft(seconds) {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return "";
+  const total = Math.max(1, Math.round(seconds));
+  if (total < 60) return `about ${total} s left`;
+  if (total < 3600) {
+    const minutes = Math.floor(total / 60);
+    const rest = total % 60;
+    return `about ${minutes} min${rest ? ` ${rest} s` : ""} left`;
+  }
+  return `about ${Math.floor(total / 3600)} h ${Math.round((total % 3600) / 60)} min left`;
+}
+
+const PHASE_TEXT = {
+  uploading: "Uploading",
+  queued: "Starting",
+  "looking up": "Looking up the video",
+  downloading: "Downloading",
+  processing: "Processing",
+  converting: "Converting",
+  retrying: "The site hiccupped, trying again",
+};
+
+/* One line such as "Downloading 42% - 3.2 MB/s - about 18 s left". */
+function describeProgress(item) {
+  const label = PHASE_TEXT[item.phase] || "Working";
+  const percent = typeof item.percent === "number" ? ` ${Math.floor(item.percent)}%` : "";
+  return [label + percent, formatSpeed(item.speed), formatTimeLeft(item.eta)]
+    .filter(Boolean)
+    .join(" \u00b7 ");
+}
+
+function setMeter(percent) {
+  const known = typeof percent === "number";
+  els.meter.classList.toggle("is-indeterminate", !known);
+  els.meterFill.style.width = known ? `${percent}%` : "";
+  els.meterPercent.textContent = known ? `${Math.floor(percent)}%` : "";
+  if (known) els.meter.setAttribute("aria-valuenow", String(Math.floor(percent)));
+  else els.meter.removeAttribute("aria-valuenow");
+}
+
 async function errorMessage(response) {
   try {
     const body = await response.json();
@@ -227,8 +283,10 @@ function setBusy(busy, { showProgress = false } = {}) {
   els.progress.hidden = !(busy && showProgress);
   if (busy && showProgress) {
     const started = Date.now();
+    setMeter(null);
+    els.progressText.textContent = "Starting...";
     const tick = () => {
-      els.elapsed.textContent = `Working for ${formatClock((Date.now() - started) / 1000)}. Long videos can take a few minutes.`;
+      els.elapsed.textContent = `Elapsed ${formatClock((Date.now() - started) / 1000)}`;
     };
     tick();
     state.timer = setInterval(tick, 1000);
@@ -700,7 +758,21 @@ function renderJob(job) {
   const finished = job.status === "done" || job.status === "cancelled";
   const handled = job.items.filter((item) => ["done", "failed", "skipped"].includes(item.status));
   els.job.hidden = false;
-  els.jobBar.style.width = `${(handled.length / job.total) * 100}%`;
+  const running = job.items.find((item) => item.status === "running");
+  const fraction = running && typeof running.percent === "number" ? running.percent / 100 : 0;
+  const overall = finished ? 1 : (handled.length + fraction) / job.total;
+  els.jobBar.style.width = `${overall * 100}%`;
+
+  if (finished || !running) {
+    els.jobDetail.textContent = "";
+  } else {
+    const parts = [describeProgress(running)];
+    const elapsed = (Date.now() - state.jobStarted) / 1000;
+    if (handled.length >= 1 && overall > 0) {
+      parts.push(`${formatTimeLeft((elapsed / overall) * (1 - overall)).replace(" left", " left overall")}`);
+    }
+    els.jobDetail.textContent = parts.filter(Boolean).join(" \u00b7 ");
+  }
 
   const failed = job.failed ? `, ${job.failed} failed` : "";
   els.jobSummary.textContent = finished
@@ -714,13 +786,17 @@ function renderJob(job) {
     row.className = `is-${item.status}`;
     const stateLabel = document.createElement("span");
     stateLabel.className = "state";
-    stateLabel.textContent = STATE_TEXT[item.status] || item.status;
+    stateLabel.textContent =
+      item.status === "running" && typeof item.percent === "number"
+        ? `${Math.floor(item.percent)}%`
+        : STATE_TEXT[item.status] || item.status;
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = item.filename || item.title;
-    if (item.error) {
+    for (const text of [item.error, item.note]) {
+      if (!text) continue;
       const reason = document.createElement("small");
-      reason.textContent = item.error;
+      reason.textContent = text;
       name.appendChild(reason);
     }
     row.append(stateLabel, name);
@@ -748,6 +824,10 @@ async function pollJob() {
     const response = await fetch(`/api/jobs/${state.jobId}`);
     if (!response.ok) throw new Error(await errorMessage(response));
     const job = await response.json();
+    if (state.jobKind === "single") {
+      renderSingleJob(job);
+      return;
+    }
     renderJob(job);
     if (job.status === "done" || job.status === "cancelled") {
       stopPolling();
@@ -790,9 +870,11 @@ async function startPlaylistJob() {
   if (!response.ok) throw new Error(await errorMessage(response));
   const job = await response.json();
   state.jobId = job.id;
+  state.jobKind = "playlist";
+  state.jobStarted = Date.now();
   renderJob(job);
   stopPolling();
-  state.poller = setInterval(pollJob, 1500);
+  state.poller = setInterval(pollJob, 1000);
 }
 
 async function cancelJob() {
@@ -817,32 +899,150 @@ async function openJobFolder() {
 
 /* ---------- convert ---------- */
 
-async function requestConversion() {
-  const format = state.format;
-  const quality = els.qualityField.hidden ? "" : els.qualitySelect.value;
+/* ---------- single link or file: a background job with live progress ---------- */
 
-  if (state.mode === "url") {
-    const url = els.urlInput.value.trim();
-    if (!url) throw new Error("Paste a video link first.");
-    return fetch("/api/convert", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, format, quality: quality || null, mute: isMuted() }),
-    });
-  }
+function currentQuality() {
+  return els.qualityField.hidden ? "" : els.qualitySelect.value;
+}
 
+async function startLinkJob() {
+  const url = els.urlInput.value.trim();
+  if (!url) throw new Error("Paste a video link first.");
+  const response = await fetch("/api/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: (state.info && state.info.title) || "Download",
+      items: [{ title: (state.info && state.info.title) || url, url }],
+      format: state.format,
+      quality: currentQuality() || null,
+      mute: isMuted(),
+      save_to_folder: false,
+      make_zip: false,
+      deliver_to_browser: true,
+    }),
+  });
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return response.json();
+}
+
+/* Upload with XMLHttpRequest because fetch cannot report upload progress. */
+function startFileJob() {
   const file = els.fileInput.files[0];
-  if (!file) throw new Error("Choose a file first.");
+  if (!file) return Promise.reject(new Error("Choose a file first."));
   const limitMb = state.catalogue.limits.max_upload_mb;
   if (file.size > limitMb * 1024 * 1024) {
-    throw new Error(`That file is larger than the ${limitMb} MB limit.`);
+    return Promise.reject(new Error(`That file is larger than the ${limitMb} MB limit.`));
   }
   const data = new FormData();
   data.append("file", file);
-  data.append("format", format);
-  if (quality) data.append("quality", quality);
+  data.append("format", state.format);
+  if (currentQuality()) data.append("quality", currentQuality());
   data.append("mute", String(isMuted()));
-  return fetch("/api/convert-file", { method: "POST", body: data });
+
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    const started = Date.now();
+    state.upload = request;
+    request.open("POST", "/api/jobs/upload");
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      const seconds = Math.max(0.2, (Date.now() - started) / 1000);
+      const speed = event.loaded / seconds;
+      showProgress({
+        phase: "uploading",
+        percent: Math.min(99, (event.loaded / event.total) * 100),
+        speed,
+        eta: (event.total - event.loaded) / speed,
+      });
+    };
+    request.onload = () => {
+      state.upload = null;
+      let body = {};
+      try { body = JSON.parse(request.responseText); } catch (_) { /* not JSON */ }
+      if (request.status >= 200 && request.status < 300) resolve(body);
+      else reject(new Error(typeof body.detail === "string" ? body.detail : `The server returned an error (${request.status}).`));
+    };
+    request.onerror = () => {
+      state.upload = null;
+      reject(new Error("The upload failed. Check that MediaForge is still running."));
+    };
+    request.onabort = () => {
+      state.upload = null;
+      reject(new Error("Stopped."));
+    };
+    request.send(data);
+  });
+}
+
+function showProgress(item) {
+  setMeter(typeof item.percent === "number" ? item.percent : null);
+  els.progressText.textContent = describeProgress(item);
+}
+
+function finishSingle(kind, message) {
+  stopPolling();
+  state.jobId = null;
+  setBusy(false);
+  setStatus(message, kind);
+}
+
+function renderSingleJob(job) {
+  const item = job.items[0];
+  if (job.status === "queued" || job.status === "running" || job.status === "uploading") {
+    showProgress(item.status === "queued" ? { phase: "queued" } : item);
+    return;
+  }
+  if (item.status === "done" && item.downloadable) {
+    const link = document.createElement("a");
+    link.href = `/api/jobs/${job.id}/items/${item.index}/file`;
+    link.download = item.filename || "";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    const note = item.note ? ` ${item.note}` : "";
+    finishSingle("success", `Done: ${item.filename}.${note}`);
+  } else if (item.status === "failed") {
+    finishSingle("error", item.error || "The conversion failed.");
+  } else {
+    finishSingle("", "Stopped.");
+  }
+}
+
+async function runSingleJob() {
+  setBusy(true, { showProgress: true });
+  setStatus("");
+  state.jobKind = "single";
+  state.jobStarted = Date.now();
+  try {
+    const job = state.mode === "url" ? await startLinkJob() : await startFileJob();
+    state.jobId = job.id;
+    renderSingleJob(job);
+    if (state.jobId) {
+      stopPolling();
+      state.poller = setInterval(pollJob, 700);
+    }
+  } catch (error) {
+    stopPolling();
+    state.jobId = null;
+    setBusy(false);
+    setStatus(error.message === "Stopped." ? "Stopped." : error.message || "Something went wrong.", error.message === "Stopped." ? "" : "error");
+  }
+}
+
+async function cancelSingleJob() {
+  if (state.upload) {
+    state.upload.abort();
+    return;
+  }
+  if (!state.jobId) return;
+  els.progressCancel.disabled = true;
+  try {
+    await fetch(`/api/jobs/${state.jobId}/cancel`, { method: "POST" });
+    els.progressText.textContent = "Stopping...";
+  } finally {
+    els.progressCancel.disabled = false;
+  }
 }
 
 async function onSubmit(event) {
@@ -863,23 +1063,37 @@ async function onSubmit(event) {
     return;
   }
 
-  setBusy(true, { showProgress: true });
-  setStatus("");
-  try {
-    const response = await requestConversion();
-    if (!response.ok) throw new Error(await errorMessage(response));
+  await runSingleJob();
+}
 
-    const blob = await response.blob();
-    const name = filenameFrom(response, `converted.${state.format}`);
-    saveBlob(blob, name);
-    const note = response.headers.get("x-mediaforge-note");
-    const extra = note ? ` ${decodeURIComponent(note)}` : "";
-    setStatus(`Done: ${name} (${formatSize(blob.size)}).${extra}`, "success");
-  } catch (error) {
-    setStatus(error.message || "Something went wrong.", "error");
-  } finally {
-    setBusy(false);
+/* ---------- theme: System, Light or Dark ---------- */
+
+const THEME_KEY = "mediaforge-theme";
+
+function savedTheme() {
+  try {
+    const value = localStorage.getItem(THEME_KEY);
+    return value === "light" || value === "dark" ? value : "system";
+  } catch (_) {
+    return "system";
   }
+}
+
+function applyTheme(choice) {
+  const root = document.documentElement;
+  if (choice === "system") root.removeAttribute("data-theme");
+  else root.dataset.theme = choice;
+  for (const button of els.themeSwitch.querySelectorAll("button")) {
+    button.setAttribute("aria-checked", String(button.dataset.themeChoice === choice));
+  }
+}
+
+function chooseTheme(choice) {
+  applyTheme(choice);
+  try {
+    if (choice === "system") localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, choice);
+  } catch (_) { /* the choice just will not be remembered */ }
 }
 
 /* ---------- setup check ---------- */
@@ -919,6 +1133,12 @@ els.playlistAll.addEventListener("change", () => {
 els.playlistList.addEventListener("change", updatePlaylistSelection);
 els.optFolder.addEventListener("change", updateFolderHint);
 els.jobCancel.addEventListener("click", cancelJob);
+els.progressCancel.addEventListener("click", cancelSingleJob);
+applyTheme(savedTheme());
+els.themeSwitch.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-theme-choice]");
+  if (button) chooseTheme(button.dataset.themeChoice);
+});
 els.jobOpen.addEventListener("click", openJobFolder);
 
 for (const input of els.kindInputs) {
