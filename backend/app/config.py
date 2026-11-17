@@ -35,3 +35,7 @@ DATA_DIR = Path(
         Path(__file__).resolve().parents[2] / "data",
     )
 )
+
+# Set to 1 only when every client that can reach the server is trusted (the Docker setup binds
+# the port to this computer). Settings, history and updates are otherwise limited to loopback.
+TRUST_ALL_CLIENTS = os.getenv("MEDIAFORGE_TRUST_CLIENTS") == "1"

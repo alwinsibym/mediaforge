@@ -2,13 +2,19 @@ services:
   mediaforge:
     build: .
     ports:
-      - "8000:8000"
+      # Only this computer can reach it. Settings and History are limited to this computer.
+      - "127.0.0.1:8000:8000"
     environment:
       # Optional limits (defaults shown).
       MEDIAFORGE_MAX_DURATION: "3600"   # seconds
       MEDIAFORGE_MAX_UPLOAD_MB: "500"
       MEDIAFORGE_DOWNLOAD_DIR: /app/downloads
+      MEDIAFORGE_DATA_DIR: /app/data
+      # Docker shows every visitor as a network address, so trust the local-only port above.
+      MEDIAFORGE_TRUST_CLIENTS: "1"
     volumes:
       # Playlist folders appear in ./downloads on your computer.
       - ./downloads:/app/downloads
+      # Settings and history survive a rebuild.
+      - ./data:/app/data
     restart: unless-stopped

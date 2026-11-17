@@ -22,6 +22,10 @@ It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), 
 - Video without sound (any quality), and square cover art that car units and Windows can show on MP3 and M4A files.
 - Works on phones and tablets too: see "Using it from other devices".
 - Live progress for every download: percent, speed and time left, with a Cancel button. Failed downloads caused by a passing site error are retried automatically.
+- Faster downloads: M4A and Opus are copied from the source without re-encoding when it already uses that codec, several playlist videos download at once (1 to 3), and fragmented videos are fetched in parallel. aria2c can be switched on in Settings.
+- Optional extras: even out the volume, skip sponsor segments (YouTube), embed subtitles, download only part of a video, split by chapter into a ZIP.
+- Sites that need a sign-in (Reddit, age-restricted YouTube, YouTube's "confirm you're not a bot") work by using the sign-in of a browser on your computer, chosen in Settings.
+- History of finished downloads with Use again, and a button that updates yt-dlp.
 - Dark, Light or System theme (the default follows your device), chosen with the toggle in the header and remembered in your browser.
 - Responsive layout.
 
@@ -105,6 +109,18 @@ To check that FFmpeg and the JavaScript runtime were found, open <http://localho
 3. Pick an output format and quality.
 4. Select **Convert and download**. Long videos and large files can take a few minutes.
 
+### More options, Settings and History
+
+Under **More options** you can even out the volume (so songs from different videos play at the same loudness), skip sponsor and self-promotion parts (YouTube only), embed subtitles in a video, download only part of a video (for example 1:20 to 3:45), and split a video into one file per chapter (you get a ZIP). Trimming and chapter splitting work on one link at a time.
+
+The two buttons in the header open **History** (finished downloads, each with **Use again**) and **Settings**. They only appear on the computer running MediaForge.
+
+- **Sign-in:** choose the browser where you are signed in, or give a `cookies.txt` file. This is how Reddit videos, age-restricted videos and YouTube's "confirm you're not a bot" check are handled. Firefox is the most reliable. With Chrome or Edge, close the browser first, as recent versions can block it. Sites may limit accounts that download a lot, so a spare account is safer.
+- **Speed:** how many playlist videos download at the same time (default 2), and aria2c for more connections per file when it is installed. aria2c cannot report a percentage, so the progress bar stays animated without a number.
+- **Update yt-dlp:** one click instead of a terminal command. Restart MediaForge afterwards to use the new version. With Docker, rebuild the image instead.
+
+If YouTube keeps asking for a sign-in check during a long playlist, MediaForge waits and retries, and if it keeps happening it stops and keeps what it saved. Choose **Retry** later and the failed videos are saved into the same folder with their original numbers.
+
 ### Playlists
 
 Paste a playlist link on the **Playlist** tab and select **Load playlist**. Untick any videos you do not want, choose where the files go, then start the job. Videos are converted one after another, and any that fail (private or removed videos, for example) are listed and skipped.
@@ -158,7 +174,10 @@ Choose **Video**, then **Sony car MP4** (about 3.3 Mbps video and 192 kbps AAC a
 | POST | `/api/thumbnail` | Body `{"url": "...", "id": "...", "format": "jpg", "square": false}`. Returns the thumbnail image |
 | POST | `/api/convert` | Body `{"url": "...", "format": "mp3", "quality": "192", "mute": false}`. Video quality can be `best`, a height such as `2160`, or a height and frame-rate cap such as `1440@30`. Returns the converted file |
 | POST | `/api/playlist/info` | Body `{"url": "..."}`. Lists the videos in a playlist |
-| POST | `/api/jobs` | Starts a playlist job: `title`, `items` (`title`, `url`), `format`, `quality`, `save_to_folder`, `make_zip` |
+| POST | `/api/jobs` | Starts a job: `title`, `items` (`title`, `url`, optional `number`), `format`, `quality`, `save_to_folder`, `make_zip`, optional `options` (`normalize`, `sponsorblock`, `subtitles`, `subtitle_langs`, `trim_start`, `trim_end`, `split_chapters`) and `continue_job` |
+| GET, POST | `/api/settings` | Read or change the settings (this computer only) |
+| GET, DELETE | `/api/history` | List or clear finished downloads (this computer only) |
+| POST | `/api/update-ytdlp` | Upgrades yt-dlp (this computer only) |
 | GET | `/api/jobs/{id}` | Progress of a job, with the state of each video |
 | POST | `/api/jobs/{id}/cancel` | Stops after the current video |
 | GET | `/api/jobs/{id}/zip` | Downloads the job's ZIP |
@@ -179,6 +198,8 @@ Set these environment variables before starting the server (or in `docker-compos
 | `MEDIAFORGE_MAX_UPLOAD_MB` | `500` | Largest uploaded file, in megabytes |
 | `MEDIAFORGE_DOWNLOAD_DIR` | `../downloads` | Where playlist folders are saved |
 | `MEDIAFORGE_MAX_PLAYLIST_ITEMS` | `200` | Most videos accepted from one playlist |
+| `MEDIAFORGE_DATA_DIR` | `../data` | Where settings and history are kept |
+| `MEDIAFORGE_TRUST_CLIENTS` | (off) | Set to `1` to let every client use Settings, History and updates (the Docker setup does, with its port limited to this computer) |
 | `MEDIAFORGE_FRONTEND_DIR` | `../frontend` | Folder served as the web UI |
 | `MEDIAFORGE_FFMPEG_DIR` | (auto-detect) | Folder containing `ffmpeg`, for when it is installed but not on the `PATH` |
 
@@ -235,7 +256,11 @@ mediaforge/
 
 **Downloads that worked stop working.** Sites change often. Update yt-dlp with `pip install -U "yt-dlp[default]"` (or rebuild the Docker image with `docker compose build --no-cache`).
 
+**"Could not reach that site" or `getaddrinfo failed`.** This computer could not look up the site's address, so it is a network or DNS problem rather than a MediaForge one. Check the connection, a VPN or firewall, and whether the site opens in your browser. Some networks block certain sites.
+
 **"HTTP Error 403: Forbidden" during a download.** The site refused one request. MediaForge retries up to three times and only then shows an error. If it keeps happening, update yt-dlp (see above).
+
+**Only part of a big playlist downloaded.** YouTube limits how fast one connection can ask for many videos. MediaForge spaces the videos out, waits when YouTube asks for a check, and stops with a **Retry** button if it keeps happening. Set your browser under Settings, use 1 parallel download, and retry after a few minutes.
 
 **"Sign in to confirm you're not a bot".** Some networks and IP addresses are challenged by YouTube. This is more common from cloud servers than from a home connection. Running MediaForge locally usually avoids it.
 

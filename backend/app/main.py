@@ -342,6 +342,8 @@ def job_open_folder(job_id: str, request: Request) -> dict:
 
 def _local_only(request: Request) -> None:
     """Settings, updates and history belong to the person at this computer."""
+    if config.TRUST_ALL_CLIENTS:
+        return
     if request.client is None or request.client.host not in _LOCAL_CLIENTS:
         raise HTTPException(
             status_code=403,

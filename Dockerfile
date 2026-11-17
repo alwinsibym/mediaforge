@@ -3,9 +3,9 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# FFmpeg does the audio/video conversion.
+# FFmpeg does the audio/video conversion. aria2 is optional (more connections per file).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg aria2 \
     && rm -rf /var/lib/apt/lists/*
 
 # yt-dlp needs a JavaScript runtime to read YouTube. Node 22 works on every CPU
