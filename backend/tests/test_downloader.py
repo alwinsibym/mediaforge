@@ -84,10 +84,11 @@ def test_preset_output_is_reencoded_for_the_car(monkeypatch, tmp_path):
         def __exit__(self, *exc):
             return False
 
-        def download(self, urls):
+        def extract_info(self, url, download=True):
             (tmp_path / "Song.mkv").write_bytes(b"video")
+            return {}
 
-    def fake_convert(source, fmt, quality, workdir, mute=False, progress=None):
+    def fake_convert(source, fmt, quality, workdir, mute=False, progress=None, normalize=False):
         calls["convert"] = (source.name, fmt, quality)
         target = workdir / "Song.mp4"
         target.write_bytes(b"car")

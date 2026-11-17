@@ -4,6 +4,7 @@ import subprocess
 import pytest
 from fastapi.testclient import TestClient
 
+from app import config, jobs
 from app.main import app
 
 requires_ffmpeg = pytest.mark.skipif(
@@ -48,3 +49,11 @@ def sample_video(tmp_path_factory):
         check=True,
     )
     return path
+
+
+@pytest.fixture(autouse=True)
+def isolated_data(monkeypatch, tmp_path):
+    """Keep settings and history out of the real data folder, and skip the playlist pacing."""
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(jobs, "PACE_MIN", 0.0)
+    monkeypatch.setattr(jobs, "PACE_MAX", 0.0)

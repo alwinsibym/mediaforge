@@ -24,7 +24,9 @@ def fake_download(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "downloads")
     calls = []
 
-    def fake(url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None):
+    def fake(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None, features=None
+    ):
         calls.append((url, fmt, quality, extra, mute))
         if "bad" in url:
             raise ConversionError("This video is private.")

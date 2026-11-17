@@ -1,6 +1,9 @@
 """MediaForge API: convert media from a URL or an uploaded file."""
 
+import importlib.metadata
 import shutil
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import quote
@@ -16,9 +19,12 @@ from . import (
     __version__,
     config,
     downloader,
+    features,
     ffmpeg_locator,
     formats,
+    history,
     jobs,
+    settings,
     transcoder,
     validators,
 )
@@ -50,6 +56,7 @@ class ThumbnailRequest(BaseModel):
 class PlaylistItem(BaseModel):
     title: str = ""
     url: str
+    number: int | None = None  # keeps the original position when retrying failed videos
 
 
 class JobRequest(BaseModel):
@@ -62,6 +69,10 @@ class JobRequest(BaseModel):
     make_zip: bool = False
     # Keep the finished file for this browser to download (used for single links).
     deliver_to_browser: bool = False
+    # Extras: normalize, sponsorblock, subtitles, subtitle_langs, trim_start, trim_end, ...
+    options: dict = {}
+    # Save into the folder of an earlier job (used to retry the videos that failed).
+    continue_job: str | None = None
 
 
 def _bad_request(exc: Exception) -> HTTPException:
@@ -89,6 +100,8 @@ def health() -> dict:
         "ffmpeg": downloader.ffmpeg_ready(),
         "ffmpeg_path": ffmpeg_locator.find_tool("ffmpeg"),
         "js_runtimes": sorted(downloader.js_runtimes()),
+        "yt_dlp": _ytdlp_version(),
+        "aria2c": downloader.aria2c_available(),
     }
 
 
@@ -218,6 +231,8 @@ def create_job(body: JobRequest) -> dict:
     """Start converting the chosen playlist videos in the background."""
     try:
         fmt, quality = formats.normalize(body.format, body.quality)
+        extras = features.parse(body.options, fmt, single=len(body.items) == 1)
+        earlier = jobs.get_job(body.continue_job) if body.continue_job else None
         job = jobs.start_job(
             body.title,
             [item.model_dump() for item in body.items],
@@ -227,6 +242,8 @@ def create_job(body: JobRequest) -> dict:
             body.make_zip,
             body.mute,
             body.deliver_to_browser,
+            extras,
+            earlier.folder if earlier else None,
         )
     except ValueError as exc:
         raise _bad_request(exc) from exc
@@ -239,13 +256,16 @@ async def create_upload_job(
     format: str = Form("mp3"),
     quality: str | None = Form(None),
     mute: bool = Form(False),
+    normalize: bool = Form(False),
 ) -> dict:
     """Upload a file and convert it in the background, with live progress."""
     try:
         fmt, quality = formats.normalize(format, quality)
     except ValueError as exc:
         raise _bad_request(exc) from exc
-    job, destination = jobs.prepare_upload_job(file.filename or "upload", fmt, quality, mute)
+    job, destination = jobs.prepare_upload_job(
+        file.filename or "upload", fmt, quality, mute, features.Features(normalize=normalize)
+    )
     try:
         await _save_upload(file, destination)
     except ConversionError as exc:
@@ -318,6 +338,94 @@ def job_open_folder(job_id: str, request: Request) -> dict:
     except (ValueError, OSError) as exc:
         raise _bad_request(exc) from exc
     return {"opened": str(job.folder)}
+
+
+def _local_only(request: Request) -> None:
+    """Settings, updates and history belong to the person at this computer."""
+    if request.client is None or request.client.host not in _LOCAL_CLIENTS:
+        raise HTTPException(
+            status_code=403,
+            detail="This can only be changed from the computer running MediaForge.",
+        )
+
+
+def _settings_payload() -> dict:
+    return {
+        **settings.load(),
+        "cookie_browsers": list(settings.COOKIE_BROWSERS),
+        "max_parallel": settings.MAX_PARALLEL,
+        "aria2c_installed": downloader.aria2c_available(),
+    }
+
+
+@app.get("/api/settings")
+def get_settings(request: Request) -> dict:
+    _local_only(request)
+    return _settings_payload()
+
+
+@app.post("/api/settings")
+def save_settings(body: dict, request: Request) -> dict:
+    _local_only(request)
+    try:
+        settings.save(body)
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+    except OSError:
+        raise HTTPException(status_code=500, detail="The settings could not be saved.") from None
+    return _settings_payload()
+
+
+@app.get("/api/history")
+def get_history(request: Request) -> dict:
+    _local_only(request)
+    return {"items": history.recent()}
+
+
+@app.delete("/api/history")
+def clear_history(request: Request) -> dict:
+    _local_only(request)
+    history.clear()
+    return {"items": []}
+
+
+def _ytdlp_version() -> str:
+    try:
+        return importlib.metadata.version("yt-dlp")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _upgrade_ytdlp() -> dict:
+    before = _ytdlp_version()
+    command = [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp[default]"]
+    try:
+        result = subprocess.run(  # noqa: S603
+            command, capture_output=True, text=True, timeout=300
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise ConversionError(
+            "The update could not be run. Try the command in a terminal."
+        ) from None
+    if result.returncode != 0:
+        lines = (result.stderr or result.stdout or "").strip().splitlines()
+        raise ConversionError(f"The update failed: {(lines or ['unknown error'])[-1][:200]}")
+    after = _ytdlp_version()
+    return {"before": before, "after": after, "changed": before != after}
+
+
+@app.post("/api/update-ytdlp")
+async def update_ytdlp(request: Request) -> dict:
+    """Upgrade yt-dlp, the part that breaks when sites change. A restart applies it."""
+    _local_only(request)
+    if jobs.any_active():
+        raise HTTPException(
+            status_code=409, detail="Wait for the current downloads to finish, then update."
+        )
+    try:
+        return await run_in_threadpool(_upgrade_ytdlp)
+    except ConversionError as exc:
+        raise _bad_request(exc) from exc
 
 
 # Serve the frontend last so /api/* routes take priority.

@@ -7,20 +7,25 @@ import shutil
 import subprocess
 import sys
 import time
+import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
 import yt_dlp
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
-from yt_dlp.utils import DownloadError
 
-from . import config, cover, ffmpeg_locator, formats, validators
+from . import config, cover, ffmpeg_locator, formats, settings, validators
+from . import features as features_mod
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class ConversionError(Exception):
     """A problem the user can understand (bad URL, too long, unsupported...)."""
+
+
+class BotCheckError(ConversionError):
+    """The site asked for proof that this is a person (YouTube's 'confirm you're not a bot')."""
 
 
 class Cancelled(Exception):
@@ -36,13 +41,60 @@ def _is_transient(message: str) -> bool:
     )
 
 
+def is_bot_check(message: str) -> bool:
+    text = message.lower()
+    return "not a bot" in text or ("sign in" in text and "confirm" in text)
+
+
+_NETWORK_HINTS = (
+    "getaddrinfo failed",
+    "errno 11001",
+    "name or service not known",
+    "temporary failure in name resolution",
+    "nodename nor servname",
+    "failed to resolve",
+    "network is unreachable",
+)
+_SIGN_IN_HINTS = ("sign in", "log in", "login required", "logged in", "authentication", "cookies")
+
+BOT_CHECK_HELP = (
+    'YouTube is asking for a sign-in check ("confirm you\'re not a bot"). Open Settings and '
+    "choose the browser where you are signed in to YouTube (Firefox is the most reliable), "
+    "then try again. Waiting a while also helps."
+)
+SIGN_IN_HELP = (
+    "This site wants you to be signed in. Open Settings and choose the browser where you are "
+    "signed in to it, then try again."
+)
+NETWORK_HELP = (
+    "This computer could not reach that site (a network or DNS problem, not a MediaForge "
+    "problem). Check your internet connection, VPN or firewall, and try opening the site in "
+    "your browser. Some networks block certain sites."
+)
+
+
 def _friendly(message: str) -> str:
-    if "403" in message or "forbidden" in message.lower():
+    text = message.lower()
+    if is_bot_check(message):
+        return BOT_CHECK_HELP
+    if any(hint in text for hint in _NETWORK_HINTS):
+        return NETWORK_HELP
+    if "403" in message or "forbidden" in text:
         return (
             "The site refused the download (HTTP 403) even after retrying. Try again in a "
             'moment. If it keeps happening, update yt-dlp with: pip install -U "yt-dlp[default]"'
         )
+    if any(hint in text for hint in _SIGN_IN_HINTS) and "private" not in text:
+        return f"{SIGN_IN_HELP} ({message[:120]})"
     return message
+
+
+def _to_error(exc: Exception) -> ConversionError:
+    """Turn a yt-dlp error into an error with a message a person can act on."""
+    message = _clean_error(exc)
+    if is_bot_check(message):
+        return BotCheckError(_friendly(message))
+    return ConversionError(_friendly(message))
 
 
 def _clean_error(exc: Exception) -> str:
@@ -102,7 +154,17 @@ def _base_options() -> dict:
     location = ffmpeg_locator.ytdlp_location()
     if location:
         options["ffmpeg_location"] = location
+
+    saved = settings.load()
+    if saved["cookies_file"]:
+        options["cookiefile"] = saved["cookies_file"]
+    elif saved["cookies_browser"]:
+        options["cookiesfrombrowser"] = (saved["cookies_browser"],)
     return options
+
+
+def aria2c_available() -> bool:
+    return shutil.which("aria2c") is not None
 
 
 _RESOLUTION_NAMES = {4320: "8K", 2160: "4K", 1440: "2K"}
@@ -220,8 +282,8 @@ def download_thumbnail(url: str, thumb_id: str, fmt: str, square: bool, workdir:
                 raise ConversionError("That thumbnail size is not available for this video.")
             chosen = sources[thumb_id]
             data = ydl.urlopen(chosen["url"]).read()
-    except DownloadError as exc:
-        raise ConversionError(_clean_error(exc)) from exc
+    except yt_dlp.utils.YoutubeDLError as exc:
+        raise _to_error(exc) from exc
     except OSError as exc:
         raise ConversionError("The thumbnail could not be downloaded.") from exc
 
@@ -258,8 +320,8 @@ def fetch_info(url: str) -> dict:
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=False)
-    except DownloadError as exc:
-        raise ConversionError(_clean_error(exc)) from exc
+    except yt_dlp.utils.YoutubeDLError as exc:
+        raise _to_error(exc) from exc
 
     return {
         "title": info.get("title") or "Untitled",
@@ -286,8 +348,8 @@ def fetch_playlist(url: str) -> dict:
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(url, download=False)
-    except DownloadError as exc:
-        raise ConversionError(_clean_error(exc)) from exc
+    except yt_dlp.utils.YoutubeDLError as exc:
+        raise _to_error(exc) from exc
 
     raw_entries = [entry for entry in (info.get("entries") or []) if entry]
     if info.get("_type") != "playlist" or not raw_entries:
@@ -404,26 +466,60 @@ def _metadata_postprocessors(fmt: str, extra: dict | None) -> list[dict]:
     return processors
 
 
+_SPONSOR_CATEGORIES = {"sponsor", "selfpromo", "interaction"}
+CHAPTER_PREFIX = "Chapter "
+
+
+def _audio_selector(fmt: str) -> str:
+    """Prefer a source that already is in the requested codec, so it can be copied unchanged."""
+    if fmt in ("m4a", "aac"):
+        return "bestaudio[ext=m4a]/bestaudio/best"
+    if fmt == "opus":
+        return "bestaudio[acodec=opus]/bestaudio/best"
+    return "bestaudio/best"
+
+
 def _build_options(
-    fmt: str, quality: str, workdir: Path, extra: dict | None = None, mute: bool = False
+    fmt: str,
+    quality: str,
+    workdir: Path,
+    extra: dict | None = None,
+    mute: bool = False,
+    features: features_mod.Features | None = None,
 ) -> dict:
+    features = features or features_mod.Features()
+    settings_now = settings.load()
     options = _base_options()
     options["outtmpl"] = str(workdir / "%(title).80s.%(ext)s")
     # Network hiccups are common (YouTube sometimes answers 403 for a moment), so retry.
     options["retries"] = 10
     options["fragment_retries"] = 10
     options["extractor_retries"] = 3
+    # Fetch several pieces of a fragmented video (DASH or HLS) at the same time.
+    options["concurrent_fragment_downloads"] = 4
+    if settings_now["aria2c"] and aria2c_available() and not features.trimmed:
+        options["external_downloader"] = {"default": "aria2c"}
+        options["external_downloader_args"] = {"aria2c": ["-x", "8", "-s", "8", "-k", "1M"]}
+
+    postprocessors: list[dict] = []
+    if features.sponsorblock:
+        postprocessors.append(
+            {
+                "key": "SponsorBlock",
+                "categories": set(_SPONSOR_CATEGORIES),
+                "when": "after_filter",
+            }
+        )
 
     if formats.is_audio(fmt):
-        options["format"] = "bestaudio/best"
-        postprocessor = {
+        options["format"] = _audio_selector(fmt)
+        convert = {
             "key": "FFmpegExtractAudio",
             "preferredcodec": formats.AUDIO_FORMATS[fmt]["ytdlp_codec"],
         }
         if fmt not in formats.LOSSLESS_AUDIO:
-            postprocessor["preferredquality"] = quality
-        options["postprocessors"] = [postprocessor]
-        options["postprocessors"] += _metadata_postprocessors(fmt, extra)
+            convert["preferredquality"] = quality
+        postprocessors.append(convert)
     else:
         options["format"] = _video_selector(fmt, quality, mute)
         # Highest resolution, then frame rate. VP9 beats AV1 on a tie because it plays on more
@@ -432,16 +528,47 @@ def _build_options(
         if formats.is_preset(fmt):
             # Download into MKV (holds any codec); FFmpeg re-encodes it afterwards.
             options["merge_output_format"] = "mkv"
-            options["postprocessors"] = _metadata_postprocessors(fmt, extra)
         else:
             options["merge_output_format"] = fmt
             # Re-mux only when the downloaded container differs from the request.
-            options["postprocessors"] = [{"key": "FFmpegVideoConvertor", "preferedformat": fmt}]
-            options["postprocessors"] += _metadata_postprocessors(fmt, extra)
-    if any(
-        pp["key"] in ("EmbedThumbnail", "FFmpegThumbnailsConvertor")
-        for pp in options.get("postprocessors", [])
-    ):
+            postprocessors.append({"key": "FFmpegVideoConvertor", "preferedformat": fmt})
+        if features.subtitles:
+            options["writesubtitles"] = True
+            options["writeautomaticsub"] = True
+            options["subtitleslangs"] = list(features.subtitle_langs)
+            postprocessors.append({"key": "FFmpegEmbedSubtitle"})
+
+    if features.sponsorblock:
+        postprocessors.append(
+            {
+                "key": "ModifyChapters",
+                "remove_chapters_patterns": [],
+                "remove_sponsor_segments": set(_SPONSOR_CATEGORIES),
+                "remove_ranges": [],
+                "force_keyframes": False,
+            }
+        )
+    postprocessors += _metadata_postprocessors(fmt, extra)
+
+    if features.split_chapters:
+        options["outtmpl"] = {
+            "default": str(workdir / "%(title).80s.%(ext)s"),
+            "chapter": str(
+                workdir / f"{CHAPTER_PREFIX}%(section_number)02d - %(section_title).80s.%(ext)s"
+            ),
+        }
+        postprocessors.append({"key": "FFmpegSplitChapters", "force_keyframes": False})
+
+    if features.trimmed:
+        end = features.trim_end if features.trim_end is not None else float("inf")
+        options["download_ranges"] = yt_dlp.utils.download_range_func(
+            [], [(features.trim_start or 0.0, end)]
+        )
+        # Cut exactly where asked, not at the nearest keyframe.
+        options["force_keyframes_at_cuts"] = True
+
+    options["postprocessors"] = postprocessors
+    if any(pp["key"] in ("EmbedThumbnail", "FFmpegThumbnailsConvertor") for pp in postprocessors):
         options["writethumbnail"] = True
     return options
 
@@ -531,6 +658,23 @@ def _add_cover(output: Path, workdir: Path, notes: list[str] | None) -> None:
                 leftover.unlink(missing_ok=True)
 
 
+def _package_chapters(workdir: Path, title: str) -> Path | None:
+    """Zip the per-chapter files yt-dlp wrote. Returns None when there were none."""
+    pieces = sorted(
+        p for p in workdir.iterdir() if p.is_file() and p.name.startswith(CHAPTER_PREFIX)
+    )
+    if not pieces:
+        return None
+    archive = workdir / f"{validators.safe_filename(title, default='chapters')} (chapters).zip"
+    with zipfile.ZipFile(archive, "w", zipfile.ZIP_STORED) as bundle:
+        for piece in pieces:
+            bundle.write(piece, arcname=piece.name)
+    for leftover in workdir.iterdir():
+        if leftover != archive and leftover.is_file():
+            leftover.unlink(missing_ok=True)
+    return archive
+
+
 def download_and_convert(
     url: str,
     fmt: str,
@@ -540,13 +684,19 @@ def download_and_convert(
     notes: list[str] | None = None,
     mute: bool = False,
     progress: ProgressCallback | None = None,
+    features: features_mod.Features | None = None,
 ) -> Path:
     """Download `url`, convert it to `fmt`, and return the output file path.
 
     `extra` may carry {"album": playlist name, "track": position} for playlist items.
+    `features` holds the optional extras (subtitles, trimming, loudness...).
     Problems that do not stop the download (such as missing cover art) are added to `notes`.
     `progress` receives dicts with phase, percent, speed and eta. It may raise `Cancelled`.
     """
+    from . import transcoder  # imported here because transcoder imports this module
+
+    features = features or features_mod.Features()
+    notes = notes if notes is not None else []
     report = progress or (lambda update: None)
     if not ffmpeg_ready():
         raise ConversionError(FFMPEG_HELP)
@@ -557,45 +707,63 @@ def download_and_convert(
     if info["is_live"]:
         raise ConversionError("Live streams can't be converted.")
     duration = info["duration"]
+    if duration and features.trimmed:
+        start = features.trim_start or 0.0
+        if start >= duration:
+            raise ConversionError("The start time is after the end of the video.")
+        duration = min(duration, features.trim_end or duration) - start
     if duration and duration > config.MAX_DURATION_SECONDS:
         limit_min = config.MAX_DURATION_SECONDS // 60
         raise ConversionError(f"This video is longer than the {limit_min}-minute limit.")
 
-    options = _build_options(fmt, quality, workdir, extra, mute and formats.is_video(fmt))
+    options = _build_options(fmt, quality, workdir, extra, mute and formats.is_video(fmt), features)
     tracker = _DownloadProgress(report)
     options["progress_hooks"] = [tracker.download_hook]
     options["postprocessor_hooks"] = [tracker.processing_hook]
 
+    result: dict = {}
     for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
         tracker.finished_bytes = 0
         try:
             with yt_dlp.YoutubeDL(options) as ydl:
-                ydl.download([url])
+                result = ydl.extract_info(url, download=True) or {}
             break
         except yt_dlp.utils.DownloadCancelled as exc:
             raise Cancelled() from exc
-        except DownloadError as exc:
+        except yt_dlp.utils.YoutubeDLError as exc:
             message = _clean_error(exc)
             if attempt < DOWNLOAD_ATTEMPTS and _is_transient(message):
                 report({"phase": "retrying", "percent": None})
                 _discard_partial_files(workdir)
                 time.sleep(2 * attempt)
                 continue
-            raise ConversionError(_friendly(message)) from exc
+            raise _to_error(exc) from exc
+
+    if features.subtitles and not result.get("requested_subtitles"):
+        notes.append("This video has no subtitles in the chosen language.")
+    if features.sponsorblock and "youtube" not in str(result.get("extractor", "")).lower():
+        notes.append("Skipping sponsor segments only works for YouTube videos.")
+
+    if features.split_chapters:
+        if result.get("chapters"):
+            archive = _package_chapters(workdir, result.get("title") or info["title"])
+            if archive is not None:
+                return archive
+        notes.append("This video has no chapters, so it was not split.")
 
     if formats.is_preset(fmt):
-        from . import transcoder  # imported here because transcoder imports this module
-
         downloaded = _find_output(workdir, "mkv")
-        output = transcoder.convert_file(downloaded, fmt, quality, workdir, mute, report)
+        output = transcoder.convert_file(
+            downloaded, fmt, quality, workdir, mute, report, normalize=features.normalize
+        )
         downloaded.unlink(missing_ok=True)
         return output
 
     output = _find_output(workdir, fmt)
     if mute and formats.is_video(fmt):
-        from . import transcoder
-
         transcoder.strip_audio(output)
+    elif features.normalize:
+        transcoder.normalize_loudness(output, fmt, quality, report)
     if fmt in cover.COVER_FORMATS:
         _add_cover(output, workdir, notes)
     return output

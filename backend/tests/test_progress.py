@@ -71,11 +71,12 @@ class _FlakyYDL:
     def __exit__(self, *exc):
         return False
 
-    def download(self, urls):
+    def extract_info(self, url, download=True):
         type(self).calls += 1
         if type(self).failures:
             raise DownloadError(type(self).failures.pop(0))
         (self.options["_dir"] / "Song.mp3").write_bytes(b"audio")
+        return {}
 
 
 @pytest.fixture
@@ -152,7 +153,9 @@ def test_media_duration(sample_video):
 def fake_download(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "downloads")
 
-    def fake(url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None):
+    def fake(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None, features=None
+    ):
         progress({"phase": "downloading", "percent": 50.0, "speed": 1000.0, "eta": 3.0})
         if notes is not None:
             notes.append("Cover art could not be added: test.")
@@ -195,7 +198,9 @@ def test_snapshot_shows_live_progress(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "downloads")
     seen = {}
 
-    def slow(url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None):
+    def slow(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None, features=None
+    ):
         progress({"phase": "downloading", "percent": 42.0, "speed": 2e6, "eta": 12.0})
         deadline = time.time() + 3
         while "item" not in seen and time.time() < deadline:
@@ -226,7 +231,9 @@ def test_cancel_stops_a_running_download(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "downloads")
     started = []
 
-    def endless(url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None):
+    def endless(
+        url, fmt, quality, workdir, extra=None, notes=None, mute=False, progress=None, features=None
+    ):
         started.append(True)
         for _ in range(200):
             progress({"phase": "downloading", "percent": 1.0})

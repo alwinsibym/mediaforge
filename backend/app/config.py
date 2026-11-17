@@ -27,3 +27,11 @@ DOWNLOAD_DIR = Path(
 
 # Most videos accepted from one playlist.
 MAX_PLAYLIST_ITEMS = int(os.getenv("MEDIAFORGE_MAX_PLAYLIST_ITEMS", "200"))
+
+# Where MediaForge keeps its own small files: settings and the download history.
+DATA_DIR = Path(
+    os.getenv(
+        "MEDIAFORGE_DATA_DIR",
+        Path(__file__).resolve().parents[2] / "data",
+    )
+)

@@ -2,22 +2,41 @@
 
 import atexit
 import os
+import random
 import shutil
 import subprocess
 import sys
 import tempfile
 import threading
+import time
 import uuid
 import zipfile
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import config, downloader, transcoder, validators
-from .downloader import ConversionError
+from . import (
+    config,
+    downloader,
+    history,
+    settings,
+    transcoder,
+    validators,
+)
+from . import (
+    features as features_mod,
+)
+from .downloader import BotCheckError, ConversionError
 
 MAX_KEPT_JOBS = 10
+
+# When YouTube asks "are you a bot", wait this long (seconds) before each new attempt.
+BOT_CHECK_WAITS = (45, 90)
+# After this many videos in a row are refused, the rest of the job is left for later.
+BOT_CHECK_STOP_AFTER = 2
+# Videos of one playlist start at least this far apart (seconds), so the site is not hammered.
+PACE_MIN, PACE_MAX = 1.5, 4.0
 
 _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mediaforge-job")
 _lock = threading.Lock()
@@ -38,6 +57,7 @@ class Item:
     speed: float | None = None  # bytes per second
     eta: float | None = None  # seconds left
     note: str | None = None
+    number: int = 0  # position shown in the file name and track number (0 means `index`)
     source: Path | None = None  # an uploaded file to convert instead of a link
     path: Path | None = None  # the finished file, when it is kept for the browser
 
@@ -59,6 +79,12 @@ class Job:
     zip_path: Path | None = None
     produced: list[Path] = field(default_factory=list)
     cancel_requested: bool = False
+    features: features_mod.Features = field(default_factory=features_mod.Features)
+    parallel: int = 1  # items worked on at the same time
+    blocked: bool = False  # the site kept asking for a sign-in check, so the job stopped early
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    next_start: float = 0.0
+    block_streak: int = 0
 
 
 def _unique_folder(base: Path, name: str) -> Path:
@@ -83,8 +109,14 @@ def start_job(
     make_zip: bool,
     mute: bool = False,
     browser_download: bool = False,
+    features: features_mod.Features | None = None,
+    folder: Path | None = None,
 ) -> Job:
-    """Validate a request, register the job and queue it."""
+    """Validate a request, register the job and queue it.
+
+    `folder` makes the job save into a folder an earlier job already made (used to retry the
+    videos that failed).
+    """
     if not (save_to_folder or make_zip or browser_download):
         raise ValueError("Choose at least one way to receive the files: a folder or a ZIP.")
     if not items:
@@ -97,6 +129,7 @@ def start_job(
             index=number,
             title=str(entry.get("title") or "Untitled")[:200],
             url=validators.validate_url(entry.get("url")),
+            number=_number(entry.get("number"), number),
         )
         for number, entry in enumerate(items, start=1)
     ]
@@ -111,10 +144,21 @@ def start_job(
         staging=Path(tempfile.mkdtemp(prefix="mediaforge-job-")),
         mute=mute,
         browser_download=browser_download,
+        features=features or features_mod.Features(),
+        parallel=settings.load()["parallel"] if len(cleaned) > 1 else 1,
+        folder=folder if folder is not None and folder.is_dir() and save_to_folder else None,
     )
     _register(job)
     _executor.submit(_run, job)
     return job
+
+
+def _number(value, fallback: int) -> int:
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return fallback
+    return number if 1 <= number <= 9999 else fallback
 
 
 def _register(job: Job) -> None:
@@ -130,7 +174,13 @@ def _register(job: Job) -> None:
                 break
 
 
-def prepare_upload_job(filename: str, fmt: str, quality: str, mute: bool) -> tuple[Job, Path]:
+def prepare_upload_job(
+    filename: str,
+    fmt: str,
+    quality: str,
+    mute: bool,
+    features: features_mod.Features | None = None,
+) -> tuple[Job, Path]:
     """Create a job for a file that is about to be uploaded. Returns it and where to save it.
 
     Call `submit_upload` once the file is saved, or `discard` if the upload fails.
@@ -152,6 +202,7 @@ def prepare_upload_job(filename: str, fmt: str, quality: str, mute: bool) -> tup
         mute=mute,
         browser_download=True,
         status="uploading",
+        features=features or features_mod.Features(),
     )
     _register(job)
     return job, destination
@@ -166,6 +217,11 @@ def discard(job: Job) -> None:
     with _lock:
         _jobs.pop(job.id, None)
     _forget(job)
+
+
+def any_active() -> bool:
+    with _lock:
+        return any(job.status in ("queued", "running", "uploading") for job in _jobs.values())
 
 
 def get_job(job_id: str) -> Job | None:
@@ -204,11 +260,15 @@ def snapshot(job: Job) -> dict:
         "total": len(job.items),
         "done": counts["done"],
         "failed": counts["failed"],
+        "blocked": job.blocked,
+        "parallel": job.parallel,
         "folder": str(job.folder) if job.folder else None,
         "zip_ready": bool(job.zip_path and job.zip_path.exists()),
         "items": [
             {
                 "index": item.index,
+                "number": item.number or item.index,
+                "url": item.url or None,
                 "title": item.title,
                 "status": item.status,
                 "error": item.error,
@@ -226,14 +286,94 @@ def snapshot(job: Job) -> dict:
 
 
 def _destination_dir(job: Job) -> Path:
-    if job.save_to_folder:
-        if job.folder is None:
-            job.folder = _unique_folder(config.DOWNLOAD_DIR, job.title)
-        job.folder.mkdir(parents=True, exist_ok=True)
-        return job.folder
-    target = job.staging / "files"
-    target.mkdir(exist_ok=True)
-    return target
+    with job.lock:
+        if job.save_to_folder:
+            if job.folder is None:
+                job.folder = _unique_folder(config.DOWNLOAD_DIR, job.title)
+            job.folder.mkdir(parents=True, exist_ok=True)
+            return job.folder
+        target = job.staging / "files"
+        target.mkdir(exist_ok=True)
+        return target
+
+
+def _sleep(job: Job, seconds: float, item: Item | None = None) -> None:
+    """Wait, but notice a Cancel request within a second. Shows the countdown on `item`."""
+    end = time.monotonic() + seconds
+    while True:
+        left = end - time.monotonic()
+        if job.cancel_requested:
+            raise downloader.Cancelled()
+        if item is not None:
+            item.eta = max(0.0, left)
+        if left <= 0:
+            return
+        time.sleep(min(1.0, left))
+
+
+def _pace(job: Job, item: Item) -> None:
+    """Space out the starts of a playlist's videos a little."""
+    if len(job.items) < 3 or item.source is not None:
+        return
+    with job.lock:
+        now = time.monotonic()
+        start = max(now, job.next_start)
+        job.next_start = start + random.uniform(PACE_MIN, PACE_MAX)  # noqa: S311
+    if start > now:
+        item.phase, item.percent = "queued", None
+        _sleep(job, start - now)
+
+
+def _produce(job: Job, item: Item, workdir: Path, report, notes: list[str]) -> Path:
+    if item.source is not None:
+        return transcoder.convert_file(
+            item.source,
+            job.fmt,
+            job.quality,
+            workdir,
+            job.mute,
+            report,
+            normalize=job.features.normalize,
+        )
+    return downloader.download_and_convert(
+        item.url,
+        job.fmt,
+        job.quality,
+        workdir,
+        {"album": job.title, "track": item.number or item.index},
+        notes,
+        job.mute,
+        report,
+        job.features,
+    )
+
+
+def _wait_out_block(job: Job, item: Item, seconds: float) -> None:
+    item.phase, item.percent, item.speed = "waiting", None, None
+    _sleep(job, seconds, item)
+
+
+def _deliver(job: Job, item: Item, output: Path) -> None:
+    if job.browser_download:
+        kept = job.staging / "files"
+        kept.mkdir(exist_ok=True)
+        final = kept / output.name
+        shutil.move(str(output), final)
+        item.path = final
+        item.filename = final.name
+        return
+    number = item.number or item.index
+    name = validators.safe_filename(f"{number:02d} - {output.stem}", max_length=120)
+    folder = _destination_dir(job)
+    with job.lock:
+        final = folder / f"{name}{output.suffix}"
+        counter = 2
+        while final.exists():
+            final = final.with_name(f"{name} ({counter}){output.suffix}")
+            counter += 1
+        shutil.move(str(output), final)
+        job.produced.append(final)
+    item.filename = final.name
 
 
 def _run_item(job: Job, item: Item) -> None:
@@ -242,42 +382,32 @@ def _run_item(job: Job, item: Item) -> None:
     report = _reporter(job, item)
     notes: list[str] = []
     try:
-        if item.source is not None:
-            output = transcoder.convert_file(
-                item.source, job.fmt, job.quality, workdir, job.mute, report
-            )
-        else:
-            output = downloader.download_and_convert(
-                item.url,
-                job.fmt,
-                job.quality,
-                workdir,
-                {"album": job.title, "track": item.index},
-                notes,
-                job.mute,
-                report,
-            )
+        _pace(job, item)
+        item.status = "running"
+        for attempt in range(len(BOT_CHECK_WAITS) + 1):
+            try:
+                output = _produce(job, item, workdir, report, notes)
+                break
+            except BotCheckError:
+                if attempt >= len(BOT_CHECK_WAITS):
+                    raise
+                downloader._discard_partial_files(workdir)
+                _wait_out_block(job, item, BOT_CHECK_WAITS[attempt])
         item.note = " ".join(notes) or None
-        if job.browser_download:
-            kept = job.staging / "files"
-            kept.mkdir(exist_ok=True)
-            final = kept / output.name
-            shutil.move(str(output), final)
-            item.path = final
-            item.filename = final.name
-        else:
-            name = validators.safe_filename(f"{item.index:02d} - {output.stem}", max_length=120)
-            final = _destination_dir(job) / f"{name}{output.suffix}"
-            counter = 2
-            while final.exists():
-                final = final.with_name(f"{name} ({counter}){output.suffix}")
-                counter += 1
-            shutil.move(str(output), final)
-            job.produced.append(final)
-            item.filename = final.name
+        _deliver(job, item, output)
         item.status = "done"
+        with job.lock:
+            job.block_streak = 0
+        if item.url:
+            history.add(item.title, item.url, job.fmt, job.quality, item.filename)
     except downloader.Cancelled:
         item.status = "skipped"
+    except BotCheckError as exc:
+        item.status, item.error = "failed", str(exc)
+        with job.lock:
+            job.block_streak += 1
+            if job.block_streak >= BOT_CHECK_STOP_AFTER:
+                job.blocked = True
     except ConversionError as exc:
         item.status, item.error = "failed", str(exc)
     except Exception:  # keep going with the rest of the playlist
@@ -296,14 +426,41 @@ def _make_zip(job: Job) -> None:
     job.zip_path = archive
 
 
+def _worker(job: Job, waiting: deque, first: bool) -> None:
+    """Take videos from the queue until it is empty, the job is cancelled, or the site blocks us."""
+    while True:
+        with job.lock:
+            if job.cancel_requested or job.blocked or not waiting:
+                return
+            # After a sign-in check only the first worker carries on, one video at a time.
+            if job.block_streak and not first:
+                return
+            item = waiting.popleft()
+        _run_item(job, item)
+
+
 def _run(job: Job) -> None:
     job.status = "running"
+    waiting = deque(job.items)
+    workers = [
+        threading.Thread(
+            target=_worker, args=(job, waiting, number == 0), name=f"mediaforge-item-{number}"
+        )
+        for number in range(max(1, min(job.parallel, len(job.items))))
+    ]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
     for item in job.items:
-        if job.cancel_requested:
+        if item.status == "queued":
             item.status = "skipped"
-            continue
-        item.status = "running"
-        _run_item(job, item)
+            if job.blocked:
+                item.error = (
+                    "Not tried: the site kept asking for a sign-in check. "
+                    "Choose Retry to continue later."
+                )
 
     if job.make_zip and job.produced:
         try:

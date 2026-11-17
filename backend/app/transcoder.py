@@ -45,12 +45,23 @@ def _sony_args(fmt: str, mute: bool = False) -> list[str]:
     return streams + _SONY_VIDEO_COMMON + video + audio
 
 
+# Evens out the volume to the level streaming sites use, with headroom against clipping.
+LOUDNORM = "loudnorm=I=-14:TP=-1.5:LRA=11"
+
+
 def build_command(
-    source: Path, target: Path, fmt: str, quality: str, mute: bool = False
+    source: Path,
+    target: Path,
+    fmt: str,
+    quality: str,
+    mute: bool = False,
+    normalize: bool = False,
 ) -> list[str]:
     """Build the ffmpeg argument list for converting `source` into `fmt`."""
     ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
     command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(source)]
+    if normalize and not mute:
+        command += ["-af", LOUDNORM]  # applies to the output below
 
     if formats.is_preset(fmt):
         command += _sony_args(fmt, mute)
@@ -147,6 +158,7 @@ def convert_file(
     workdir: Path,
     mute: bool = False,
     progress=None,
+    normalize: bool = False,
 ) -> Path:
     """Convert `source` and return the path of the converted file.
 
@@ -161,7 +173,7 @@ def convert_file(
     if target == source:
         target = workdir / f"{source.stem}-converted.{ext}"
 
-    command = build_command(source, target, fmt, quality, mute)
+    command = build_command(source, target, fmt, quality, mute, normalize)
     if progress is not None:
         progress({"phase": "converting", "percent": 0})
         code, error_text = _run_with_progress(command, media_duration(source), progress)
@@ -204,3 +216,48 @@ def strip_audio(path: Path) -> None:
             f"FFmpeg could not remove the sound: {(lines or ['error'])[-1][:200]}"
         )
     silent.replace(path)
+
+
+# Audio codec to use when a finished file has to be re-encoded to change its volume.
+_NORMALIZE_CODECS = {
+    "mp3": ("libmp3lame", True),
+    "m4a": ("aac", True),
+    "aac": ("aac", True),
+    "mp4": ("aac", True),
+    "mkv": ("aac", True),
+    "webm": ("libopus", True),
+    "ogg": ("libvorbis", True),
+    "opus": ("libopus", True),
+    "flac": ("flac", False),
+    "wav": ("pcm_s16le", False),
+}
+
+
+def normalize_loudness(path: Path, fmt: str, quality: str, progress=None) -> None:
+    """Even out the volume of a finished file in place. The picture is copied, not re-encoded."""
+    if not ffmpeg_available():
+        raise ConversionError(FFMPEG_HELP)
+    codec, lossy = _NORMALIZE_CODECS.get(fmt, ("aac", True))
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
+    louder = path.with_name(f"{path.stem}.normalized{path.suffix}")
+    command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(path)]
+    command += ["-map", "0", "-map_metadata", "0", "-c", "copy", "-c:a", codec]
+    if lossy and quality.isdigit():
+        command += ["-b:a", f"{quality}k"]
+    elif lossy:
+        command += ["-b:a", "192k"]
+    command += ["-af", LOUDNORM]
+    if fmt == "mp3":
+        command += ["-id3v2_version", "3"]
+    command.append(str(louder))
+
+    report = progress or (lambda update: None)
+    report({"phase": "converting", "percent": 0})
+    code, error_text = _run_with_progress(command, media_duration(path), report)
+    if code != 0 or not louder.exists():
+        louder.unlink(missing_ok=True)
+        lines = error_text.strip().splitlines()
+        raise ConversionError(
+            f"FFmpeg could not even out the volume: {(lines or ['error'])[-1][:200]}"
+        )
+    louder.replace(path)
