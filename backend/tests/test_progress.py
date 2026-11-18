@@ -61,6 +61,7 @@ def test_cancelling_inside_a_hook_stops_yt_dlp():
 class _FlakyYDL:
     failures: list[str] = []
     calls = 0
+    used_aria2c: list[bool] = []
 
     def __init__(self, options):
         self.options = options
@@ -73,6 +74,7 @@ class _FlakyYDL:
 
     def extract_info(self, url, download=True):
         type(self).calls += 1
+        type(self).used_aria2c.append("external_downloader" in self.options)
         if type(self).failures:
             raise DownloadError(type(self).failures.pop(0))
         (self.options["_dir"] / "Song.mp3").write_bytes(b"audio")
@@ -82,6 +84,7 @@ class _FlakyYDL:
 @pytest.fixture
 def flaky(monkeypatch, tmp_path):
     _FlakyYDL.calls = 0
+    _FlakyYDL.used_aria2c = []
     monkeypatch.setattr(downloader.time, "sleep", lambda seconds: None)
     monkeypatch.setattr(downloader, "ffmpeg_ready", lambda: True)
     monkeypatch.setattr(
@@ -278,3 +281,25 @@ def test_upload_job_rejects_empty_files(client):
         "/api/jobs/upload", files={"file": ("a.mp4", b"")}, data={"format": "mp3"}
     )
     assert response.status_code == 400
+
+
+def test_a_failing_aria2c_falls_back_to_the_built_in_downloader(flaky, monkeypatch):
+    from app import settings
+
+    settings.save({"aria2c": True})
+    monkeypatch.setattr(downloader, "aria2c_available", lambda: True)
+    _FlakyYDL.failures = ["ERROR: aria2c exited with code 1"]
+    output = downloader.download_and_convert("https://e.com/v", "mp3", "192", flaky)
+    assert output.name == "Song.mp3"
+    assert _FlakyYDL.used_aria2c == [True, False]
+
+
+def test_aria2c_is_told_not_to_use_ipv6(monkeypatch):
+    from pathlib import Path
+
+    from app import settings
+
+    settings.save({"aria2c": True})
+    monkeypatch.setattr(downloader, "aria2c_available", lambda: True)
+    options = downloader._build_options("mp3", "192", Path("/tmp/x"))
+    assert "--disable-ipv6=true" in options["external_downloader_args"]["aria2c"]

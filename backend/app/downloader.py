@@ -549,7 +549,9 @@ def _build_options(
     options["concurrent_fragment_downloads"] = 4
     if settings_now["aria2c"] and aria2c_available() and not features.trimmed:
         options["external_downloader"] = {"default": "aria2c"}
-        options["external_downloader_args"] = {"aria2c": ["-x", "8", "-s", "8", "-k", "1M"]}
+        options["external_downloader_args"] = {
+            "aria2c": ["-x", "8", "-s", "8", "-k", "1M", "--disable-ipv6=true"]
+        }
 
     postprocessors: list[dict] = []
     if features.sponsorblock:
@@ -782,6 +784,14 @@ def download_and_convert(
             raise Cancelled() from exc
         except yt_dlp.utils.YoutubeDLError as exc:
             message = _clean_error(exc)
+            if "aria2c" in message.lower() and "external_downloader" in options:
+                # aria2c failed (often a network quirk on this computer). The built-in
+                # downloader is slower but reliable, so finish the job with it.
+                options.pop("external_downloader")
+                options.pop("external_downloader_args", None)
+                report({"phase": "retrying", "percent": None})
+                _discard_partial_files(workdir)
+                continue
             if attempt < DOWNLOAD_ATTEMPTS and _is_transient(message):
                 report({"phase": "retrying", "percent": None})
                 _discard_partial_files(workdir)
