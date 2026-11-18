@@ -456,3 +456,121 @@ def test_browser_cookie_problems_are_explained():
     )
     text = downloader._friendly(message)
     assert "Firefox" in text and "cookies.txt" in text
+
+
+# ---------- internet outages and unfinished downloads ----------
+
+
+def test_timeouts_and_missing_videos_are_explained():
+    timeout = (
+        "Unable to download webpage: Connection to example.com timed out. (connect timeout=30.0)"
+    )
+    assert isinstance(downloader._to_error(Exception(timeout)), downloader.NetworkError)
+    assert "did not answer in time" in downloader._friendly(timeout)
+    twitter = "[twitter] 211: No video could be found in this tweet"
+    text = downloader._friendly(twitter)
+    assert "pictures" in text and "Settings" in text
+
+
+def test_a_download_waits_for_the_internet_and_continues(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "dl")
+    monkeypatch.setattr(jobs, "OFFLINE_POLL", 0.0)
+    answers = iter([False, False, False, True])
+    monkeypatch.setattr(jobs, "_online", lambda: next(answers, True))
+    attempts = {"n": 0}
+
+    def behaviour(url):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise downloader.NetworkError("could not reach that site")
+
+    _fake(monkeypatch, behaviour)
+    job = _wait(jobs.start_job("Mix", _entries(1), "mp3", "192", True, False).id)
+    assert job.items[0].status == "done" and attempts["n"] == 2
+    assert not job.blocked
+
+
+def test_an_outage_that_never_ends_fails_the_video(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "dl")
+    monkeypatch.setattr(jobs, "OFFLINE_POLL", 0.0)
+    monkeypatch.setattr(jobs, "OFFLINE_MAX_WAIT", 0.0)
+    monkeypatch.setattr(jobs, "_online", lambda: False)
+
+    def behaviour(url):
+        raise downloader.NetworkError("could not reach that site")
+
+    _fake(monkeypatch, behaviour)
+    job = _wait(jobs.start_job("Mix", _entries(1), "mp3", "192", True, False).id)
+    assert job.items[0].status == "failed"
+
+
+def test_unfinished_videos_are_listed_and_resumed(monkeypatch, tmp_path, client):
+    from app import pending
+
+    monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "dl")
+    monkeypatch.setattr(jobs, "NETWORK_WAITS", (0,))
+    monkeypatch.setattr(jobs, "_online", lambda: True)
+    settings.save({"parallel": 1})
+
+    def behaviour(url):
+        if url.endswith(("v3", "v4")):
+            raise downloader.NetworkError("could not reach that site")
+
+    _fake(monkeypatch, behaviour)
+    job = _wait(jobs.start_job("Mix", _entries(4), "mp3", "192", True, False).id)
+    assert [item.status for item in job.items] == ["done", "done", "failed", "failed"]
+
+    listed = client.get("/api/pending").json()["items"]
+    assert len(listed) == 1 and listed[0]["left"] == 2 and listed[0]["title"] == "Mix"
+
+    _fake(monkeypatch, lambda url: None)
+    resumed = client.post(f"/api/pending/{listed[0]['id']}/resume").json()
+    assert [item["number"] for item in resumed["items"]] == [3, 4]
+    assert resumed["request"]["format"] == "mp3"
+    done = _wait(resumed["id"])
+    assert all(item.status == "done" for item in done.items)
+    assert done.folder == job.folder
+    assert sorted(p.name[:2] for p in done.folder.iterdir()) == ["01", "02", "03", "04"]
+    assert pending.all_entries() == []  # nothing left to resume
+
+
+def test_pending_entries_can_be_discarded_and_are_local_only(client):
+    from fastapi.testclient import TestClient
+
+    from app import pending
+    from app.main import app
+
+    pending.save(
+        "abc",
+        {"title": "T", "format": "mp3", "quality": "192", "items": [{"url": "u", "number": 1}]},
+    )
+    remote = TestClient(app, client=("192.168.1.9", 1))
+    assert remote.get("/api/pending").status_code == 403
+    assert client.delete("/api/pending/abc").json() == {"items": []}
+    assert client.post("/api/pending/missing/resume").status_code == 404
+
+
+def test_the_retry_button_replaces_the_pending_entry(monkeypatch, tmp_path, client):
+    from app import pending
+
+    monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "dl")
+    _fake(monkeypatch, lambda url: None)
+    first = _wait(jobs.start_job("Mix", _entries(1), "mp3", "192", True, False).id)
+    pending.save(
+        first.id,
+        {
+            "title": "Mix",
+            "format": "mp3",
+            "quality": "192",
+            "items": [{"url": "https://example.com/v9", "number": 9}],
+        },
+    )
+    body = {
+        "title": "Mix",
+        "items": [{"url": "https://example.com/v9", "number": 9}],
+        "format": "mp3",
+        "save_to_folder": True,
+        "continue_job": first.id,
+    }
+    assert client.post("/api/jobs", json=body).status_code == 200
+    assert pending.get(first.id) is None

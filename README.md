@@ -119,6 +119,8 @@ The two buttons in the header open **History** (finished downloads, each with **
 - **Speed:** how many playlist videos download at the same time (default 2), and aria2c for more connections per file when it is installed. aria2c cannot report a percentage, so the progress bar stays animated without a number.
 - **Update yt-dlp:** one click instead of a terminal command. Restart MediaForge afterwards to use the new version. With Docker, rebuild the image instead.
 
+**No internet:** if the connection drops, downloads pause and carry on by themselves when it is back (for up to 30 minutes per video). Videos that could not be finished, whether the connection never returned, the site kept refusing, or MediaForge was closed, are listed under **Unfinished downloads** at the top of the page with **Resume** and **Remove**. Resume saves them into the same folder with their original numbers. This list covers playlist jobs that save to a folder.
+
 If YouTube keeps asking for a sign-in check during a long playlist, MediaForge waits and retries, and if it keeps happening it stops and keeps what it saved. Choose **Retry** later and the failed videos are saved into the same folder with their original numbers.
 
 ### Playlists
@@ -259,6 +261,10 @@ mediaforge/
 **"Could not reach that site" or `getaddrinfo failed`.** This computer could not look up the site's address, so it is a network or DNS problem rather than a MediaForge one. Check the connection, a VPN or firewall, and whether the site opens in your browser. Some networks block certain sites.
 
 **"HTTP Error 403: Forbidden" during a download.** The site refused one request. MediaForge retries up to three times and only then shows an error. If it keeps happening, update yt-dlp (see above).
+
+**"No video could be found in this tweet" (X).** The post has only text or pictures, the video belongs to a quoted or replied-to post (paste that post's link), or X hides it from visitors who are not signed in (choose your browser in Settings). MediaForge saves videos and audio, not images.
+
+**"Connection timed out".** The site did not answer. It may be down, slow, or blocked by your network, VPN or firewall. Check that it opens in your browser.
 
 **Only part of a big playlist downloaded.** YouTube limits how fast one connection can ask for many videos. MediaForge spaces the videos out, waits when YouTube asks for a check, and stops with a **Retry** button if it keeps happening. Set your browser under Settings, use 1 parallel download, and retry after a few minutes.
 

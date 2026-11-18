@@ -24,6 +24,7 @@ from . import (
     formats,
     history,
     jobs,
+    pending,
     settings,
     transcoder,
     validators,
@@ -244,9 +245,12 @@ def create_job(body: JobRequest) -> dict:
             body.deliver_to_browser,
             extras,
             earlier.folder if earlier else None,
+            body.options,
         )
     except ValueError as exc:
         raise _bad_request(exc) from exc
+    if body.continue_job:
+        pending.remove(body.continue_job)  # its leftovers now belong to the new job
     return jobs.snapshot(job)
 
 
@@ -389,6 +393,71 @@ def clear_history(request: Request) -> dict:
     _local_only(request)
     history.clear()
     return {"items": []}
+
+
+@app.get("/api/pending")
+def get_pending(request: Request) -> dict:
+    _local_only(request)
+    return {
+        "items": [
+            {
+                "id": entry["id"],
+                "title": entry["title"],
+                "format": entry["format"],
+                "left": len(entry["items"]),
+                "created": entry.get("created"),
+            }
+            for entry in pending.all_entries()
+        ]
+    }
+
+
+@app.post("/api/pending/{pending_id}/resume")
+def resume_pending(pending_id: str, request: Request) -> dict:
+    """Start the videos that were left unfinished, into the same folder with the same numbers."""
+    _local_only(request)
+    entry = pending.get(pending_id)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="That download list is no longer there.")
+    try:
+        fmt, quality = formats.normalize(entry["format"], entry["quality"])
+        extras = features.parse(entry.get("options"), fmt, single=len(entry["items"]) == 1)
+        folder = Path(entry["folder"]) if entry.get("folder") else None
+        job = jobs.start_job(
+            entry["title"],
+            entry["items"],
+            fmt,
+            quality,
+            True,
+            False,
+            bool(entry.get("mute")),
+            False,
+            extras,
+            folder,
+            entry.get("options"),
+        )
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+    pending.remove(pending_id)
+    return {
+        **jobs.snapshot(job),
+        "request": {
+            "title": entry["title"],
+            "format": fmt,
+            "quality": quality,
+            "mute": bool(entry.get("mute")),
+            "save_to_folder": True,
+            "make_zip": False,
+            "options": entry.get("options") or {},
+        },
+    }
+
+
+@app.delete("/api/pending/{pending_id}")
+def discard_pending(pending_id: str, request: Request) -> dict:
+    _local_only(request)
+    pending.remove(pending_id)
+    return get_pending(request)
 
 
 def _ytdlp_version() -> str:

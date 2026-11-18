@@ -788,3 +788,18 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 
 .dialog-actions .btn { width: auto; min-width: 110px; padding: 11px 22px; }
 .dialog-actions { align-items: center; }
+
+/* Unfinished downloads */
+.pending {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  background: var(--accent-soft);
+  border-radius: 14px;
+}
+.pending h2 { margin: 0 0 8px; font-size: 1rem; }
+.pending-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pending-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.pending-list .name { min-width: 0; overflow-wrap: anywhere; }
+.pending-list small { display: block; color: var(--muted); }
+.pending-list .actions { display: flex; gap: 8px; }
+.pending-list .btn { width: auto; padding: 8px 14px; }

@@ -69,6 +69,7 @@ _NETWORK_HINTS = (
     "failed to resolve",
     "network is unreachable",
 )
+_TIMEOUT_HINTS = ("connect timeout", "timed out")
 _SIGN_IN_HINTS = ("sign in", "log in", "login required", "logged in", "authentication", "cookies")
 
 BOT_CHECK_HELP = (
@@ -104,8 +105,23 @@ COOKIES_HELP = (
 )
 
 
+TIMEOUT_HELP = (
+    "The site did not answer in time (the connection timed out). The site may be down or slow, "
+    "or your network, VPN or firewall may be blocking it. Check that the site opens in your "
+    "browser, then try again."
+)
+NO_VIDEO_HELP = (
+    "No video was found in that post. It may only have text or pictures (MediaForge saves "
+    "videos and audio, not images), the video may belong to a quoted or replied-to post (paste "
+    "that post's link instead), or the site hides it from visitors who are not signed in "
+    "(choose your browser in Settings)."
+)
+
+
 def _friendly(message: str) -> str:
     text = message.lower()
+    if "no video could be found" in text or "no video formats found" in text:
+        return NO_VIDEO_HELP
     if "cookie database" in text or "decrypt" in text and "cookie" in text:
         return COOKIES_HELP
     if any(hint in text for hint in ("connectionreset", "forcibly closed", "connection aborted")):
@@ -114,6 +130,8 @@ def _friendly(message: str) -> str:
         return BOT_CHECK_HELP
     if any(hint in text for hint in _NETWORK_HINTS):
         return NETWORK_HELP
+    if any(hint in text for hint in _TIMEOUT_HINTS):
+        return TIMEOUT_HELP
     if "403" in message or "forbidden" in text:
         return (
             "The site refused the download (HTTP 403) even after retrying. Try again in a "
@@ -126,7 +144,7 @@ def _friendly(message: str) -> str:
 
 def is_network_problem(message: str) -> bool:
     text = message.lower()
-    return any(hint in text for hint in _NETWORK_HINTS)
+    return any(hint in text for hint in _NETWORK_HINTS + _TIMEOUT_HINTS)
 
 
 def _to_error(exc: Exception) -> ConversionError:

@@ -4,6 +4,7 @@ import atexit
 import os
 import random
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ from . import (
     config,
     downloader,
     history,
+    pending,
     settings,
     transcoder,
     validators,
@@ -37,6 +39,9 @@ BOT_CHECK_WAITS = (45, 90)
 NETWORK_WAITS = (15, 45, 120)
 # After this many videos in a row cannot reach the site, the rest of the job is left for later.
 NETWORK_STOP_AFTER = 3
+# How long (seconds) to wait for the internet to come back before giving up on a video.
+OFFLINE_MAX_WAIT = 30 * 60
+OFFLINE_POLL = 3.0
 # After this many videos in a row are refused, the rest of the job is left for later.
 BOT_CHECK_STOP_AFTER = 2
 # Videos of one playlist start at least this far apart (seconds), so the site is not hammered.
@@ -117,9 +122,11 @@ def start_job(
     browser_download: bool = False,
     features: features_mod.Features | None = None,
     folder: Path | None = None,
+    options: dict | None = None,
 ) -> Job:
     """Validate a request, register the job and queue it.
 
+    `options` are the extras as the person chose them, kept so an unfinished job can resume.
     `folder` makes the job save into a folder an earlier job already made (used to retry the
     videos that failed).
     """
@@ -155,8 +162,47 @@ def start_job(
         folder=folder if folder is not None and folder.is_dir() and save_to_folder else None,
     )
     _register(job)
+    if save_to_folder and not browser_download:
+        pending.save(
+            job.id,
+            {
+                "title": title,
+                "format": fmt,
+                "quality": quality,
+                "mute": mute,
+                "options": options or {},
+                "folder": str(job.folder) if job.folder else None,
+                "items": [
+                    {"title": item.title, "url": item.url, "number": item.number or item.index}
+                    for item in cleaned
+                ],
+            },
+        )
     _executor.submit(_run, job)
     return job
+
+
+def _online() -> bool:
+    """True when the internet answers. Tries two public servers, quickly."""
+    for address in (("1.1.1.1", 443), ("8.8.8.8", 53)):
+        try:
+            socket.create_connection(address, timeout=3).close()
+            return True
+        except OSError:
+            continue
+    return False
+
+
+def _wait_for_internet(job: Job, item: Item) -> None:
+    """Pause until the internet is back, so the download can carry on where it stopped."""
+    item.phase, item.percent, item.speed, item.eta = "offline", None, None, None
+    deadline = time.monotonic() + OFFLINE_MAX_WAIT
+    while True:
+        _sleep(job, OFFLINE_POLL)
+        if _online():
+            return
+        if time.monotonic() > deadline:
+            raise NetworkError("The internet connection did not come back.")
 
 
 def _number(value, fallback: int) -> int:
@@ -297,6 +343,7 @@ def _destination_dir(job: Job) -> Path:
         if job.save_to_folder:
             if job.folder is None:
                 job.folder = _unique_folder(config.DOWNLOAD_DIR, job.title)
+                pending.set_folder(job.id, str(job.folder))
             job.folder.mkdir(parents=True, exist_ok=True)
             return job.folder
         target = job.staging / "files"
@@ -402,9 +449,14 @@ def _run_item(job: Job, item: Item) -> None:
                 wait, phase = BOT_CHECK_WAITS[bot_tries], "waiting"
                 bot_tries += 1
             except NetworkError:
+                if not _online():
+                    # The whole connection is down: wait for it, then continue the same
+                    # download (yt-dlp resumes the partly downloaded file).
+                    _wait_for_internet(job, item)
+                    continue
                 if network_tries >= len(NETWORK_WAITS):
                     raise
-                wait, phase = NETWORK_WAITS[network_tries], "offline"
+                wait, phase = NETWORK_WAITS[network_tries], "waiting"
                 network_tries += 1
             downloader._discard_partial_files(workdir)
             _wait_out_block(job, item, wait, phase)
@@ -415,6 +467,7 @@ def _run_item(job: Job, item: Item) -> None:
             job.block_streak = job.network_streak = 0
         if item.url:
             history.add(item.title, item.url, job.fmt, job.quality, item.filename)
+            pending.mark_done(job.id, item.number or item.index)
     except downloader.Cancelled:
         item.status = "skipped"
     except BotCheckError as exc:

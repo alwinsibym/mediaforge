@@ -48,6 +48,8 @@ const els = {
   trimEnd: $("trim-end"),
   extraChapters: $("extra-chapters"),
   optChapters: $("opt-chapters"),
+  pending: $("pending"),
+  pendingList: $("pending-list"),
   historyBtn: $("history-btn"),
   settingsBtn: $("settings-btn"),
   settingsDialog: $("settings-dialog"),
@@ -241,7 +243,7 @@ const PHASE_TEXT = {
   converting: "Converting",
   retrying: "The site hiccupped, trying again",
   waiting: "The site asked for a sign-in check. Waiting before trying again",
-  offline: "Cannot reach the site. Waiting before trying again",
+  offline: "No internet connection. Waiting for it to come back",
 };
 
 /* One line such as "Downloading 42% - 3.2 MB/s - about 18 s left". */
@@ -931,6 +933,7 @@ async function pollJob() {
       stopPolling();
       setBusy(false);
       updatePlaylistSelection();
+      loadPending();
       if (job.folder) {
         const where = isThisComputer() ? "" : " (on the computer running MediaForge)";
         setStatus(`Saved to ${job.folder}${where}`, "success");
@@ -1353,6 +1356,78 @@ function renderHistory(items) {
   }
 }
 
+/* ---------- unfinished downloads ---------- */
+
+async function loadPending() {
+  try {
+    const response = await fetch("/api/pending");
+    if (!response.ok) return;
+    renderPending((await response.json()).items);
+  } catch (_) {
+    /* the list is only a convenience */
+  }
+}
+
+function renderPending(items) {
+  els.pendingList.replaceChildren();
+  els.pending.hidden = items.length === 0;
+  for (const entry of items) {
+    const row = document.createElement("li");
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = entry.title;
+    const left = document.createElement("small");
+    left.textContent = `${entry.left} video${entry.left === 1 ? "" : "s"} left`;
+    name.appendChild(left);
+
+    const resume = document.createElement("button");
+    resume.type = "button";
+    resume.className = "btn btn-primary";
+    resume.textContent = "Resume";
+    resume.addEventListener("click", () => resumePending(entry.id));
+    const discard = document.createElement("button");
+    discard.type = "button";
+    discard.className = "btn btn-quiet";
+    discard.textContent = "Remove";
+    discard.addEventListener("click", async () => {
+      const response = await fetch(`/api/pending/${entry.id}`, { method: "DELETE" });
+      if (response.ok) renderPending((await response.json()).items);
+    });
+    const actions = document.createElement("span");
+    actions.className = "actions";
+    actions.append(resume, discard);
+    row.append(name, actions);
+    els.pendingList.appendChild(row);
+  }
+}
+
+async function resumePending(id) {
+  if (state.busy) {
+    setStatus("Wait for the current download to finish, then resume.", "error");
+    return;
+  }
+  setBusy(true);
+  setStatus("");
+  els.submitBtn.textContent = "Working through the playlist...";
+  try {
+    const response = await fetch(`/api/pending/${id}/resume`, { method: "POST" });
+    if (!response.ok) throw new Error(await errorMessage(response));
+    const { request, ...job } = await response.json();
+    state.lastBody = request;
+    state.jobId = job.id;
+    state.jobKind = "playlist";
+    state.jobStarted = Date.now();
+    els.pending.hidden = true;
+    renderJob(job);
+    stopPolling();
+    state.poller = setInterval(pollJob, 1000);
+  } catch (error) {
+    setBusy(false);
+    updatePlaylistSelection();
+    setStatus(error.message || "Something went wrong.", "error");
+  }
+}
+
 async function clearHistory() {
   const response = await fetch("/api/history", { method: "DELETE" });
   if (response.ok) renderHistory([]);
@@ -1368,6 +1443,7 @@ async function revealLocalTools() {
   }
   els.historyBtn.hidden = false;
   els.settingsBtn.hidden = false;
+  loadPending();
 }
 
 function closeOnBackdrop(dialog) {
