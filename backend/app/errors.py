@@ -55,6 +55,30 @@ CATALOG: dict[str, dict] = {
             "Update yt-dlp from Settings.",
         ],
     },
+    "MF-NET-04": {
+        "title": "The secure connection could not be trusted",
+        "summary": "The site's security certificate was not accepted (self-signed certificate).",
+        "what": "Sites prove who they are with a certificate. Something between this computer and "
+        "the site presented a certificate that Windows and Python do not trust, so MediaForge "
+        "stopped to keep the connection safe.",
+        "why": [
+            "Antivirus 'HTTPS scanning' or 'web shield' (Kaspersky, Avast, ESET, Bitdefender) "
+            "re-signs secure pages with its own certificate.",
+            "A college, office or public Wi-Fi network inspects secure traffic with its own "
+            "certificate.",
+            "A VPN or proxy does the same.",
+            "Rarely, the site itself uses a self-signed certificate.",
+        ],
+        "fix": [
+            "Try another network, such as a phone hotspot. If it works there, the first network "
+            "is the cause.",
+            "Turn off HTTPS scanning in your antivirus, or add python.exe and ffmpeg.exe to its "
+            "exceptions.",
+            "Turn off the VPN or proxy and try again.",
+            "Do not turn certificate checking off: that would let anyone on the network read "
+            "your traffic.",
+        ],
+    },
     "MF-SITE-01": {
         "title": "The site wants proof you are a person",
         "summary": "The site is asking to confirm that this is not a bot.",
@@ -293,6 +317,8 @@ def classify(message: str) -> str:
         return "MF-SITE-01"
     if has("no video could be found", "no video formats found", "no video was found"):
         return "MF-SITE-04"
+    if has("certificate_verify_failed", "certificate verify failed", "self-signed certificate"):
+        return "MF-NET-04"
     if has(
         "getaddrinfo",
         "errno 11001",

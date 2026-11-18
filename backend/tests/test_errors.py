@@ -17,6 +17,7 @@ from app.main import app
         ("Could not copy Chrome cookie database", "MF-COOK-01"),
         ("HTTP Error 429: Too Many Requests", "MF-SITE-08"),
         ("Unsupported URL: https://x.test", "MF-SITE-06"),
+        ("[SSL: CERTIFICATE_VERIFY_FAILED] self-signed certificate", "MF-NET-04"),
         ("Something nobody expected", "MF-GEN-00"),
     ],
 )
