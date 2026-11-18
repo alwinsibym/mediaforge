@@ -107,6 +107,8 @@ def media_duration(path: Path) -> float | None:
             [ffmpeg, "-hide_banner", "-i", str(path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -124,7 +126,12 @@ def _run_with_progress(command: list[str], duration: float | None, report) -> tu
     started = time.monotonic()
     with tempfile.TemporaryFile("w+") as errors:
         process = subprocess.Popen(  # noqa: S603
-            command, stdout=subprocess.PIPE, stderr=errors, text=True
+            command,
+            stdout=subprocess.PIPE,
+            stderr=errors,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
         )
         try:
             assert process.stdout is not None
@@ -180,7 +187,12 @@ def convert_file(
     else:
         try:
             result = subprocess.run(
-                command, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS
+                command,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=FFMPEG_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired as exc:
             raise ConversionError("The conversion took too long and was stopped.") from exc
@@ -204,7 +216,12 @@ def strip_audio(path: Path) -> None:
     command += ["-map", "0", "-map", "-0:a", "-c", "copy", "-map_metadata", "0", str(silent)]
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=FFMPEG_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired as exc:
         silent.unlink(missing_ok=True)

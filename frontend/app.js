@@ -241,6 +241,7 @@ const PHASE_TEXT = {
   converting: "Converting",
   retrying: "The site hiccupped, trying again",
   waiting: "The site asked for a sign-in check. Waiting before trying again",
+  offline: "Cannot reach the site. Waiting before trying again",
 };
 
 /* One line such as "Downloading 42% - 3.2 MB/s - about 18 s left". */
@@ -863,9 +864,12 @@ function renderJob(job) {
   els.jobNotice.hidden = !(finished && job.blocked);
   if (job.blocked) {
     els.jobNotice.textContent =
-      "The site kept asking for a sign-in check, so MediaForge stopped before it got worse. " +
-      "Open Settings and choose the browser where you are signed in, wait a few minutes, " +
-      "then choose Retry. The videos already saved are kept.";
+      job.blocked_reason === "network"
+        ? "MediaForge could not reach the site, so it stopped instead of failing every video. " +
+          "Check your internet connection, then choose Retry. The videos already saved are kept."
+        : "The site kept asking for a sign-in check, so MediaForge stopped before it got worse. " +
+          "Open Settings and choose the browser where you are signed in, wait a few minutes, " +
+          "then choose Retry. The videos already saved are kept.";
   }
 
   const failed = job.failed ? `, ${job.failed} failed` : "";

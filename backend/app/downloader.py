@@ -28,6 +28,10 @@ class BotCheckError(ConversionError):
     """The site asked for proof that this is a person (YouTube's 'confirm you're not a bot')."""
 
 
+class NetworkError(ConversionError):
+    """This computer could not reach the site (DNS or connection trouble)."""
+
+
 class Cancelled(Exception):
     """The person stopped the job."""
 
@@ -89,11 +93,18 @@ def _friendly(message: str) -> str:
     return message
 
 
+def is_network_problem(message: str) -> bool:
+    text = message.lower()
+    return any(hint in text for hint in _NETWORK_HINTS)
+
+
 def _to_error(exc: Exception) -> ConversionError:
     """Turn a yt-dlp error into an error with a message a person can act on."""
     message = _clean_error(exc)
     if is_bot_check(message):
         return BotCheckError(_friendly(message))
+    if is_network_problem(message):
+        return NetworkError(_friendly(message))
     return ConversionError(_friendly(message))
 
 
@@ -307,7 +318,15 @@ def download_thumbnail(url: str, thumb_id: str, fmt: str, square: bool, workdir:
     if square:
         command += ["-vf", "crop='min(iw,ih)':'min(iw,ih)'"]
     command += ["-frames:v", "1", *_THUMBNAIL_ENCODERS[fmt], str(target)]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=120, check=False)
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=120,
+        check=False,
+    )
     raw.unlink(missing_ok=True)
     if result.returncode != 0 or not target.exists():
         raise ConversionError("The thumbnail could not be converted.")

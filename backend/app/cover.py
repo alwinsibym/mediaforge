@@ -25,7 +25,13 @@ class CoverError(Exception):
 def _run(command: list[str]) -> None:
     try:
         result = subprocess.run(
-            command, capture_output=True, text=True, timeout=TIMEOUT_SECONDS, check=False
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=TIMEOUT_SECONDS,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise CoverError(str(exc)) from exc
@@ -50,6 +56,8 @@ def has_cover(audio: Path) -> bool:
         [ffmpeg, "-hide_banner", "-i", str(audio)],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=TIMEOUT_SECONDS,
         check=False,
     )

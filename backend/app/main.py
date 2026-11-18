@@ -403,7 +403,7 @@ def _upgrade_ytdlp() -> dict:
     command = [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp[default]"]
     try:
         result = subprocess.run(  # noqa: S603
-            command, capture_output=True, text=True, timeout=300
+            command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300
         )
     except (OSError, subprocess.TimeoutExpired):
         raise ConversionError(

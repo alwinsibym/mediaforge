@@ -390,3 +390,55 @@ def test_job_request_checks_the_extras(client):
     base = {"items": [{"url": "https://e.com/a"}, {"url": "https://e.com/b"}], "format": "mp3"}
     response = client.post("/api/jobs", json={**base, "options": {"trim_start": "0:10"}})
     assert response.status_code == 400 and "one video" in response.json()["detail"]
+
+
+# ---------- unreadable program output and lost connections ----------
+
+
+def test_program_output_that_is_not_valid_text_does_not_break_cover_checks(tmp_path, monkeypatch):
+    """FFmpeg can print bytes Windows' default text decoding rejects (seen as cp1252 errors)."""
+    from app import cover, ffmpeg_locator
+
+    script = tmp_path / "fake-ffmpeg"
+    script.write_text("#!/bin/sh\nprintf 'title \\235 Stream #0:1: Video: mjpeg' >&2\n")
+    script.chmod(0o755)
+    monkeypatch.setattr(ffmpeg_locator, "find_tool", lambda name: str(script))
+    assert cover.has_cover(tmp_path / "x.mp3") is True
+
+
+def test_dns_failures_are_network_errors():
+    error = downloader._to_error(Exception("[Errno 11001] getaddrinfo failed"))
+    assert isinstance(error, downloader.NetworkError)
+    assert "could not reach that site" in str(error)
+
+
+def test_a_lost_connection_is_waited_out_and_retried(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "dl")
+    monkeypatch.setattr(jobs, "NETWORK_WAITS", (0, 0))
+    attempts = {"n": 0}
+
+    def behaviour(url):
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            raise downloader.NetworkError("could not reach that site")
+
+    _fake(monkeypatch, behaviour)
+    job = _wait(jobs.start_job("Mix", _entries(1), "mp3", "192", True, False).id)
+    assert job.items[0].status == "done" and attempts["n"] == 3
+    assert not job.blocked
+
+
+def test_a_long_outage_stops_the_job_for_a_later_retry(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "DOWNLOAD_DIR", tmp_path / "dl")
+    monkeypatch.setattr(jobs, "NETWORK_WAITS", (0,))
+    settings.save({"parallel": 1})
+
+    def behaviour(url):
+        raise downloader.NetworkError("could not reach that site")
+
+    _fake(monkeypatch, behaviour)
+    job = _wait(jobs.start_job("Mix", _entries(8), "mp3", "192", True, False).id)
+    assert job.blocked and job.blocked_reason == "network"
+    assert [item.status for item in job.items].count("failed") == 3
+    assert [item.status for item in job.items].count("skipped") == 5
+    assert "connection" in job.items[7].error

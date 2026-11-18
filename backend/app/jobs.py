@@ -27,12 +27,16 @@ from . import (
 from . import (
     features as features_mod,
 )
-from .downloader import BotCheckError, ConversionError
+from .downloader import BotCheckError, ConversionError, NetworkError
 
 MAX_KEPT_JOBS = 10
 
 # When YouTube asks "are you a bot", wait this long (seconds) before each new attempt.
 BOT_CHECK_WAITS = (45, 90)
+# When the internet connection to the site drops, wait this long (seconds) before each new attempt.
+NETWORK_WAITS = (15, 45, 120)
+# After this many videos in a row cannot reach the site, the rest of the job is left for later.
+NETWORK_STOP_AFTER = 3
 # After this many videos in a row are refused, the rest of the job is left for later.
 BOT_CHECK_STOP_AFTER = 2
 # Videos of one playlist start at least this far apart (seconds), so the site is not hammered.
@@ -81,7 +85,9 @@ class Job:
     cancel_requested: bool = False
     features: features_mod.Features = field(default_factory=features_mod.Features)
     parallel: int = 1  # items worked on at the same time
-    blocked: bool = False  # the site kept asking for a sign-in check, so the job stopped early
+    blocked: bool = False  # the job stopped early because the site kept refusing or was unreachable
+    blocked_reason: str = ""  # "sign-in" or "network"
+    network_streak: int = 0
     lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     next_start: float = 0.0
     block_streak: int = 0
@@ -261,6 +267,7 @@ def snapshot(job: Job) -> dict:
         "done": counts["done"],
         "failed": counts["failed"],
         "blocked": job.blocked,
+        "blocked_reason": job.blocked_reason,
         "parallel": job.parallel,
         "folder": str(job.folder) if job.folder else None,
         "zip_ready": bool(job.zip_path and job.zip_path.exists()),
@@ -348,8 +355,8 @@ def _produce(job: Job, item: Item, workdir: Path, report, notes: list[str]) -> P
     )
 
 
-def _wait_out_block(job: Job, item: Item, seconds: float) -> None:
-    item.phase, item.percent, item.speed = "waiting", None, None
+def _wait_out_block(job: Job, item: Item, seconds: float, phase: str = "waiting") -> None:
+    item.phase, item.percent, item.speed = phase, None, None
     _sleep(job, seconds, item)
 
 
@@ -384,20 +391,28 @@ def _run_item(job: Job, item: Item) -> None:
     try:
         _pace(job, item)
         item.status = "running"
-        for attempt in range(len(BOT_CHECK_WAITS) + 1):
+        bot_tries = network_tries = 0
+        while True:
             try:
                 output = _produce(job, item, workdir, report, notes)
                 break
             except BotCheckError:
-                if attempt >= len(BOT_CHECK_WAITS):
+                if bot_tries >= len(BOT_CHECK_WAITS):
                     raise
-                downloader._discard_partial_files(workdir)
-                _wait_out_block(job, item, BOT_CHECK_WAITS[attempt])
+                wait, phase = BOT_CHECK_WAITS[bot_tries], "waiting"
+                bot_tries += 1
+            except NetworkError:
+                if network_tries >= len(NETWORK_WAITS):
+                    raise
+                wait, phase = NETWORK_WAITS[network_tries], "offline"
+                network_tries += 1
+            downloader._discard_partial_files(workdir)
+            _wait_out_block(job, item, wait, phase)
         item.note = " ".join(notes) or None
         _deliver(job, item, output)
         item.status = "done"
         with job.lock:
-            job.block_streak = 0
+            job.block_streak = job.network_streak = 0
         if item.url:
             history.add(item.title, item.url, job.fmt, job.quality, item.filename)
     except downloader.Cancelled:
@@ -407,7 +422,13 @@ def _run_item(job: Job, item: Item) -> None:
         with job.lock:
             job.block_streak += 1
             if job.block_streak >= BOT_CHECK_STOP_AFTER:
-                job.blocked = True
+                job.blocked, job.blocked_reason = True, job.blocked_reason or "sign-in"
+    except NetworkError as exc:
+        item.status, item.error = "failed", str(exc)
+        with job.lock:
+            job.network_streak += 1
+            if job.network_streak >= NETWORK_STOP_AFTER:
+                job.blocked, job.blocked_reason = True, job.blocked_reason or "network"
     except ConversionError as exc:
         item.status, item.error = "failed", str(exc)
     except Exception:  # keep going with the rest of the playlist
@@ -433,7 +454,7 @@ def _worker(job: Job, waiting: deque, first: bool) -> None:
             if job.cancel_requested or job.blocked or not waiting:
                 return
             # After a sign-in check only the first worker carries on, one video at a time.
-            if job.block_streak and not first:
+            if (job.block_streak or job.network_streak) and not first:
                 return
             item = waiting.popleft()
         _run_item(job, item)
@@ -457,10 +478,12 @@ def _run(job: Job) -> None:
         if item.status == "queued":
             item.status = "skipped"
             if job.blocked:
-                item.error = (
-                    "Not tried: the site kept asking for a sign-in check. "
-                    "Choose Retry to continue later."
+                reason = (
+                    "the connection to the site was lost"
+                    if job.blocked_reason == "network"
+                    else "the site kept asking for a sign-in check"
                 )
+                item.error = f"Not tried: {reason}. Choose Retry to continue later."
 
     if job.make_zip and job.produced:
         try:
