@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from starlette.background import BackgroundTask
@@ -19,6 +19,7 @@ from . import (
     __version__,
     config,
     downloader,
+    errors,
     features,
     ffmpeg_locator,
     formats,
@@ -76,8 +77,21 @@ class JobRequest(BaseModel):
     continue_job: str | None = None
 
 
+class ApiError(HTTPException):
+    """An HTTP error that also carries the full explanation for the page."""
+
+    def __init__(self, status_code: int, detail: str, info: dict):
+        super().__init__(status_code=status_code, detail=detail)
+        self.info = info
+
+
+@app.exception_handler(ApiError)
+async def _api_error(_request: Request, exc: ApiError):
+    return JSONResponse({"detail": exc.detail, "error": exc.info}, status_code=exc.status_code)
+
+
 def _bad_request(exc: Exception) -> HTTPException:
-    return HTTPException(status_code=400, detail=str(exc))
+    return ApiError(400, str(exc), errors.describe_exception(exc))
 
 
 def _cleanup(path: str) -> None:

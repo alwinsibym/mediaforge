@@ -14,14 +14,22 @@ from pathlib import Path
 import yt_dlp
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
-from . import config, cover, ffmpeg_locator, formats, settings, validators
+from . import config, cover, errors, ffmpeg_locator, formats, settings, validators
 from . import features as features_mod
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 class ConversionError(Exception):
-    """A problem the user can understand (bad URL, too long, unsupported...)."""
+    """A problem the user can understand (bad URL, too long, unsupported...).
+
+    `code` is an error code from `errors.CATALOG`, and `technical` the original message.
+    """
+
+    def __init__(self, message: str = "", code: str | None = None, technical: str | None = None):
+        super().__init__(message)
+        self.code = code
+        self.technical = technical
 
 
 class BotCheckError(ConversionError):
@@ -150,11 +158,13 @@ def is_network_problem(message: str) -> bool:
 def _to_error(exc: Exception) -> ConversionError:
     """Turn a yt-dlp error into an error with a message a person can act on."""
     message = _clean_error(exc)
+    code = errors.classify(message)
+    friendly = _friendly(message)
     if is_bot_check(message):
-        return BotCheckError(_friendly(message))
+        return BotCheckError(friendly, code, message)
     if is_network_problem(message):
-        return NetworkError(_friendly(message))
-    return ConversionError(_friendly(message))
+        return NetworkError(friendly, code, message)
+    return ConversionError(friendly, code, message)
 
 
 def _clean_error(exc: Exception) -> str:
@@ -362,7 +372,7 @@ def download_thumbnail(url: str, thumb_id: str, fmt: str, square: bool, workdir:
 
     ffmpeg = ffmpeg_locator.find_tool("ffmpeg")
     if not ffmpeg:
-        raise ConversionError(FFMPEG_HELP)
+        raise ConversionError(FFMPEG_HELP, "MF-TOOL-01")
     command = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-i", str(raw)]
     if square:
         command += ["-vf", "crop='min(iw,ih)':'min(iw,ih)'"]
@@ -698,7 +708,7 @@ def _find_output(workdir: Path, extension: str) -> Path:
         p for p in workdir.iterdir() if p.is_file() and p.suffix not in {".part", ".ytdl", ".tmp"}
     ]
     if not files:
-        raise ConversionError("Conversion finished but no file was produced.")
+        raise ConversionError("Conversion finished but no file was produced.", "MF-TOOL-03")
     preferred = [p for p in files if p.suffix.lower() == f".{extension}"]
     return max(preferred or files, key=lambda p: p.stat().st_size)
 
@@ -769,13 +779,13 @@ def download_and_convert(
     notes = notes if notes is not None else []
     report = progress or (lambda update: None)
     if not ffmpeg_ready():
-        raise ConversionError(FFMPEG_HELP)
+        raise ConversionError(FFMPEG_HELP, "MF-TOOL-01")
 
     report({"phase": "looking up", "percent": None})
     info = fetch_info(url)
 
     if info["is_live"]:
-        raise ConversionError("Live streams can't be converted.")
+        raise ConversionError("Live streams can't be converted.", "MF-LIM-01")
     duration = info["duration"]
     if duration and features.trimmed:
         start = features.trim_start or 0.0
@@ -784,7 +794,9 @@ def download_and_convert(
         duration = min(duration, features.trim_end or duration) - start
     if duration and duration > config.MAX_DURATION_SECONDS:
         limit_min = config.MAX_DURATION_SECONDS // 60
-        raise ConversionError(f"This video is longer than the {limit_min}-minute limit.")
+        raise ConversionError(
+            f"This video is longer than the {limit_min}-minute limit.", "MF-LIM-02"
+        )
 
     options = _build_options(fmt, quality, workdir, extra, mute and formats.is_video(fmt), features)
     tracker = _DownloadProgress(report)

@@ -190,9 +190,78 @@ function staticQualityLabel(value) {
 
 /* ---------- helpers ---------- */
 
-function setStatus(message, kind = "") {
-  els.status.textContent = message;
+function setStatus(message, kind = "", info = null) {
   els.status.className = "status" + (kind ? ` is-${kind}` : "");
+  if (info) {
+    els.status.replaceChildren(buildErrorCard(info, message));
+    els.status.classList.add("has-card");
+  } else {
+    els.status.textContent = message;
+  }
+}
+
+/* Shows a caught error. Errors from the server carry a full explanation in `.info`. */
+function setProblem(error, fallback = "Something went wrong.") {
+  setStatus((error && error.message) || fallback, "error", error && error.info);
+}
+
+function listBlock(heading, lines, ordered) {
+  const wrap = document.createElement("div");
+  wrap.className = "err-block";
+  const title = document.createElement("h4");
+  title.textContent = heading;
+  const list = document.createElement(ordered ? "ol" : "ul");
+  for (const line of lines) {
+    const li = document.createElement("li");
+    li.textContent = line;
+    list.appendChild(li);
+  }
+  wrap.append(title, list);
+  return wrap;
+}
+
+/* A short title and code first; the longer explanation opens on request. */
+function buildErrorCard(info, message) {
+  const card = document.createElement("div");
+  card.className = "err-card";
+  const head = document.createElement("div");
+  head.className = "err-head";
+  const title = document.createElement("strong");
+  title.textContent = info.title;
+  const code = document.createElement("code");
+  code.className = "err-code";
+  code.textContent = info.code;
+  head.append(title, code);
+  const summary = document.createElement("p");
+  summary.className = "err-summary";
+  summary.textContent = info.summary;
+  card.append(head, summary);
+  if (message && message !== info.summary && message !== info.title && message !== info.technical) {
+    const detail = document.createElement("p");
+    detail.className = "err-message";
+    detail.textContent = message;
+    card.appendChild(detail);
+  }
+  const more = document.createElement("details");
+  more.className = "err-more";
+  const toggle = document.createElement("summary");
+  toggle.textContent = "What happened and what to do";
+  more.appendChild(toggle);
+  const what = document.createElement("p");
+  what.textContent = info.what;
+  more.appendChild(what);
+  if (info.why && info.why.length) more.appendChild(listBlock("Why this can happen", info.why, false));
+  if (info.fix && info.fix.length) more.appendChild(listBlock("What to do now", info.fix, true));
+  if (info.technical) {
+    const tech = document.createElement("pre");
+    tech.className = "err-tech";
+    tech.textContent = info.technical;
+    const label = document.createElement("h4");
+    label.textContent = "Technical details";
+    more.append(label, tech);
+  }
+  card.appendChild(more);
+  return card;
 }
 
 function formatClock(seconds) {
@@ -264,13 +333,18 @@ function setMeter(percent) {
   else els.meter.removeAttribute("aria-valuenow");
 }
 
-async function errorMessage(response) {
+async function problemFrom(response) {
+  let message = `The server returned an error (${response.status}).`;
+  let info = null;
   try {
     const body = await response.json();
-    if (typeof body.detail === "string") return body.detail;
-    if (Array.isArray(body.detail)) return "Please check your input and try again.";
+    if (typeof body.detail === "string") message = body.detail;
+    else if (Array.isArray(body.detail)) message = "Please check your input and try again.";
+    if (body.error && body.error.code) info = body.error;
   } catch (_) { /* not JSON */ }
-  return `The server returned an error (${response.status}).`;
+  const error = new Error(message);
+  error.info = info;
+  return error;
 }
 
 function filenameFrom(response, fallback) {
@@ -631,7 +705,7 @@ async function previewUrl({ quiet = false } = {}) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     const info = await response.json();
     if (els.urlInput.value.trim() !== url) return; // the link changed while we waited
     state.previewedUrl = url;
@@ -640,7 +714,7 @@ async function previewUrl({ quiet = false } = {}) {
   } catch (error) {
     if (els.urlInput.value.trim() === url) {
       resetPreview();
-      setStatus(error.message, "error");
+      setProblem(error);
     }
   } finally {
     setBusy(false);
@@ -680,13 +754,13 @@ async function downloadThumbnail() {
         square: els.thumbSquare.checked,
       }),
     });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     const blob = await response.blob();
     const name = filenameFrom(response, `thumbnail.${els.thumbFormat.value}`);
     saveBlob(blob, name);
     setStatus(`Saved ${name} (${formatSize(blob.size)})`, "success");
   } catch (error) {
-    setStatus(error.message || "The thumbnail could not be saved.", "error");
+    setProblem(error, "The thumbnail could not be saved.");
   } finally {
     els.thumbDownload.disabled = false;
   }
@@ -802,7 +876,7 @@ async function loadPlaylist() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
     });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     state.playlist = await response.json();
     renderPlaylist(state.playlist);
     const limit = state.playlist.limit;
@@ -812,7 +886,7 @@ async function loadPlaylist() {
   } catch (error) {
     state.playlist = null;
     els.playlistBox.hidden = true;
-    setStatus(error.message, "error");
+    setProblem(error);
   } finally {
     setBusy(false);
     updatePlaylistSelection();
@@ -899,6 +973,19 @@ function renderJob(job) {
       reason.textContent = text;
       name.appendChild(reason);
     }
+    if (item.error_info) {
+      const info = item.error_info;
+      const more = document.createElement("details");
+      more.className = "err-row";
+      const toggle = document.createElement("summary");
+      toggle.textContent = `${info.title} (${info.code})`;
+      more.appendChild(toggle);
+      const what = document.createElement("p");
+      what.textContent = info.what;
+      more.appendChild(what);
+      if (info.fix && info.fix.length) more.appendChild(listBlock("What to do now", info.fix, true));
+      name.appendChild(more);
+    }
     row.append(stateLabel, name);
     els.jobItems.appendChild(row);
   }
@@ -922,7 +1009,7 @@ function stopPolling() {
 async function pollJob() {
   try {
     const response = await fetch(`/api/jobs/${state.jobId}`);
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     const job = await response.json();
     if (state.jobKind === "single") {
       renderSingleJob(job);
@@ -944,7 +1031,7 @@ async function pollJob() {
   } catch (error) {
     stopPolling();
     setBusy(false);
-    setStatus(error.message || "Lost contact with the server.", "error");
+    setProblem(error, "Lost contact with the server.");
   }
 }
 
@@ -975,7 +1062,7 @@ async function startPlaylistJob({ retry = false } = {}) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(await errorMessage(response));
+  if (!response.ok) throw await problemFrom(response);
   const job = await response.json();
   state.lastBody = { ...body, continue_job: undefined };
   state.jobId = job.id;
@@ -996,7 +1083,7 @@ async function retryFailed() {
   } catch (error) {
     setBusy(false);
     updatePlaylistSelection();
-    setStatus(error.message || "Something went wrong.", "error");
+    setProblem(error, "Something went wrong.");
   }
 }
 
@@ -1014,9 +1101,9 @@ async function cancelJob() {
 async function openJobFolder() {
   try {
     const response = await fetch(`/api/jobs/${state.jobId}/open-folder`, { method: "POST" });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
   } catch (error) {
-    setStatus(error.message, "error");
+    setProblem(error);
   }
 }
 
@@ -1046,7 +1133,7 @@ async function startLinkJob() {
       options: collectOptions(),
     }),
   });
-  if (!response.ok) throw new Error(await errorMessage(response));
+  if (!response.ok) throw await problemFrom(response);
   return response.json();
 }
 
@@ -1105,11 +1192,11 @@ function showProgress(item) {
   els.progressText.textContent = describeProgress(item);
 }
 
-function finishSingle(kind, message) {
+function finishSingle(kind, message, info = null) {
   stopPolling();
   state.jobId = null;
   setBusy(false);
-  setStatus(message, kind);
+  setStatus(message, kind, info);
 }
 
 function renderSingleJob(job) {
@@ -1128,7 +1215,7 @@ function renderSingleJob(job) {
     const note = item.note ? ` ${item.note}` : "";
     finishSingle("success", `Done: ${item.filename}.${note}`);
   } else if (item.status === "failed") {
-    finishSingle("error", item.error || "The conversion failed.");
+    finishSingle("error", item.error || "The conversion failed.", item.error_info);
   } else {
     finishSingle("", "Stopped.");
   }
@@ -1183,7 +1270,7 @@ async function onSubmit(event) {
     } catch (error) {
       setBusy(false);
       updatePlaylistSelection();
-      setStatus(error.message || "Something went wrong.", "error");
+      setProblem(error, "Something went wrong.");
     }
     return;
   }
@@ -1242,7 +1329,7 @@ async function openSettings() {
       fetch("/api/settings"),
       fetch("/api/health"),
     ]);
-    if (!settingsResponse.ok) throw new Error(await errorMessage(settingsResponse));
+    if (!settingsResponse.ok) throw await problemFrom(settingsResponse);
     const saved = await settingsResponse.json();
     const health = await healthResponse.json();
 
@@ -1262,7 +1349,7 @@ async function openSettings() {
     els.ytdlpVersion.textContent = health.yt_dlp ? `Installed: yt-dlp ${health.yt_dlp}.` : "";
     els.settingsDialog.showModal();
   } catch (error) {
-    setStatus(error.message || "Settings could not be opened.", "error");
+    setProblem(error, "Settings could not be opened.");
   }
 }
 
@@ -1281,7 +1368,7 @@ async function saveSettings(event) {
         aria2c: els.setAria2c.checked,
       }),
     });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     els.settingsDialog.close();
     setStatus("Settings saved.", "success");
   } catch (error) {
@@ -1295,7 +1382,7 @@ async function updateYtdlp() {
   els.ytdlpResult.textContent = "Updating. This can take a minute...";
   try {
     const response = await fetch("/api/update-ytdlp", { method: "POST" });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     const result = await response.json();
     els.ytdlpResult.textContent = result.changed
       ? `Updated from ${result.before} to ${result.after}. Close MediaForge and start it again to use the new version.`
@@ -1325,11 +1412,11 @@ function useAgain(entry) {
 async function openHistory() {
   try {
     const response = await fetch("/api/history");
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     renderHistory((await response.json()).items);
     els.historyDialog.showModal();
   } catch (error) {
-    setStatus(error.message || "History could not be opened.", "error");
+    setProblem(error, "History could not be opened.");
   }
 }
 
@@ -1411,7 +1498,7 @@ async function resumePending(id) {
   els.submitBtn.textContent = "Working through the playlist...";
   try {
     const response = await fetch(`/api/pending/${id}/resume`, { method: "POST" });
-    if (!response.ok) throw new Error(await errorMessage(response));
+    if (!response.ok) throw await problemFrom(response);
     const { request, ...job } = await response.json();
     state.lastBody = request;
     state.jobId = job.id;
@@ -1424,7 +1511,7 @@ async function resumePending(id) {
   } catch (error) {
     setBusy(false);
     updatePlaylistSelection();
-    setStatus(error.message || "Something went wrong.", "error");
+    setProblem(error, "Something went wrong.");
   }
 }
 

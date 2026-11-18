@@ -20,6 +20,7 @@ from pathlib import Path
 from . import (
     config,
     downloader,
+    errors,
     history,
     pending,
     settings,
@@ -66,6 +67,7 @@ class Item:
     speed: float | None = None  # bytes per second
     eta: float | None = None  # seconds left
     note: str | None = None
+    error_info: dict | None = None
     number: int = 0  # position shown in the file name and track number (0 means `index`)
     source: Path | None = None  # an uploaded file to convert instead of a link
     path: Path | None = None  # the finished file, when it is kept for the browser
@@ -325,6 +327,7 @@ def snapshot(job: Job) -> dict:
                 "title": item.title,
                 "status": item.status,
                 "error": item.error,
+                "error_info": item.error_info,
                 "filename": item.filename,
                 "phase": item.phase,
                 "percent": item.percent,
@@ -472,20 +475,24 @@ def _run_item(job: Job, item: Item) -> None:
         item.status = "skipped"
     except BotCheckError as exc:
         item.status, item.error = "failed", str(exc)
+        item.error_info = errors.describe_exception(exc)
         with job.lock:
             job.block_streak += 1
             if job.block_streak >= BOT_CHECK_STOP_AFTER:
                 job.blocked, job.blocked_reason = True, job.blocked_reason or "sign-in"
     except NetworkError as exc:
         item.status, item.error = "failed", str(exc)
+        item.error_info = errors.describe_exception(exc)
         with job.lock:
             job.network_streak += 1
             if job.network_streak >= NETWORK_STOP_AFTER:
                 job.blocked, job.blocked_reason = True, job.blocked_reason or "network"
     except ConversionError as exc:
         item.status, item.error = "failed", str(exc)
+        item.error_info = errors.describe_exception(exc)
     except Exception:  # keep going with the rest of the playlist
         item.status, item.error = "failed", "Unexpected error while converting this video."
+        item.error_info = errors.describe("MF-GEN-00")
     finally:
         item.phase = item.percent = item.speed = item.eta = None
         shutil.rmtree(workdir, ignore_errors=True)

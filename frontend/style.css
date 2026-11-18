@@ -803,3 +803,21 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .pending-list small { display: block; color: var(--muted); }
 .pending-list .actions { display: flex; gap: 8px; }
 .pending-list .btn { width: auto; padding: 8px 14px; }
+
+/* Error card */
+.status.has-card { padding: 0; background: var(--danger-bg); }
+.err-card { padding: 12px 14px; color: var(--text); }
+.err-card strong { color: var(--danger); }
+.err-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.err-code { font-size: 0.78rem; padding: 2px 7px; border-radius: 6px; background: var(--surface); color: var(--danger); border: 1px solid var(--danger); }
+.err-summary { margin: 6px 0 0; }
+.err-message { margin: 6px 0 0; font-size: 0.88rem; opacity: 0.85; }
+.err-more { margin-top: 10px; font-size: 0.92rem; }
+.err-more > summary, .err-row > summary { cursor: pointer; font-weight: 600; }
+.err-more p { margin: 8px 0 0; }
+.err-block h4, .err-more > h4 { margin: 12px 0 4px; font-size: 0.86rem; }
+.err-block ul, .err-block ol { margin: 0; padding-left: 20px; }
+.err-block li { margin: 2px 0; }
+.err-tech { margin: 0; padding: 8px 10px; border-radius: 8px; background: var(--surface); white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; max-height: 140px; overflow: auto; }
+.err-row { margin-top: 6px; font-size: 0.85rem; }
+.err-row p { margin: 6px 0 0; }
