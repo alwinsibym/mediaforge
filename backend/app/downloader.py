@@ -96,8 +96,18 @@ CONNECTION_CLOSED_HELP = (
 )
 
 
+COOKIES_HELP = (
+    "MediaForge could not read the sign-in from your browser. Chrome and Edge lock their "
+    "cookie file while they run, and recent versions also encrypt it so other programs cannot "
+    "read it. Use Firefox in Settings instead, or export a cookies.txt file from your browser "
+    "(for example with the 'Get cookies.txt LOCALLY' extension) and choose that file in Settings."
+)
+
+
 def _friendly(message: str) -> str:
     text = message.lower()
+    if "cookie database" in text or "decrypt" in text and "cookie" in text:
+        return COOKIES_HELP
     if any(hint in text for hint in ("connectionreset", "forcibly closed", "connection aborted")):
         return CONNECTION_CLOSED_HELP
     if is_bot_check(message):

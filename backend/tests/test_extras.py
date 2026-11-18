@@ -448,3 +448,11 @@ def test_a_closed_connection_is_retried_and_explained():
     message = "Unable to download webpage: ('Connection aborted.', ConnectionResetError(10054))"
     assert downloader._is_transient(message)
     assert "closed the connection" in downloader._friendly(message)
+
+
+def test_browser_cookie_problems_are_explained():
+    message = (
+        "Could not copy Chrome cookie database. See https://github.com/yt-dlp/yt-dlp/issues/7271"
+    )
+    text = downloader._friendly(message)
+    assert "Firefox" in text and "cookies.txt" in text
