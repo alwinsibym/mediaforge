@@ -41,7 +41,17 @@ def _is_transient(message: str) -> bool:
     text = message.lower()
     return any(
         hint in text
-        for hint in ("403", "forbidden", "timed out", "timeout", "http error 5", "connection reset")
+        for hint in (
+            "403",
+            "forbidden",
+            "timed out",
+            "timeout",
+            "http error 5",
+            "connection reset",
+            "connectionreset",
+            "forcibly closed",
+            "connection aborted",
+        )
     )
 
 
@@ -77,8 +87,19 @@ NETWORK_HELP = (
 )
 
 
+CONNECTION_CLOSED_HELP = (
+    "The site closed the connection while MediaForge was loading its page. This usually means "
+    "the site blocks automated downloads, or something on your network (a VPN, antivirus "
+    "web protection, firewall or your internet provider) is cutting the connection. Try again "
+    "with the VPN or antivirus web shield turned off, or turned on if the site is blocked in "
+    "your country."
+)
+
+
 def _friendly(message: str) -> str:
     text = message.lower()
+    if any(hint in text for hint in ("connectionreset", "forcibly closed", "connection aborted")):
+        return CONNECTION_CLOSED_HELP
     if is_bot_check(message):
         return BOT_CHECK_HELP
     if any(hint in text for hint in _NETWORK_HINTS):

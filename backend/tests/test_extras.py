@@ -442,3 +442,9 @@ def test_a_long_outage_stops_the_job_for_a_later_retry(monkeypatch, tmp_path):
     assert [item.status for item in job.items].count("failed") == 3
     assert [item.status for item in job.items].count("skipped") == 5
     assert "connection" in job.items[7].error
+
+
+def test_a_closed_connection_is_retried_and_explained():
+    message = "Unable to download webpage: ('Connection aborted.', ConnectionResetError(10054))"
+    assert downloader._is_transient(message)
+    assert "closed the connection" in downloader._friendly(message)
