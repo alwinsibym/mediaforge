@@ -509,12 +509,24 @@ def _can_embed_cover(fmt: str) -> bool:
     return True
 
 
+class _SetTitlePP(yt_dlp.postprocessor.PostProcessor):
+    """Replaces the video's title with the person's own, before the file is named and tagged."""
+
+    def __init__(self, title: str) -> None:
+        super().__init__(None)
+        self._title = title
+
+    def run(self, info):
+        info["title"] = self._title
+        return [], info
+
+
 def _template_text(value: str) -> str:
     """Make text safe to use as the default value inside a yt-dlp template."""
     return re.sub(r"[()|%\r\n]", " ", value).strip()
 
 
-def _metadata_postprocessors(fmt: str, extra: dict | None) -> list[dict]:
+def _metadata_postprocessors(fmt: str, extra: dict | None, title: str | None = None) -> list[dict]:
     """Postprocessors that write title, artist, album and cover art into the file.
 
     `extra` can hold the playlist name ("album") and position ("track"). They are only
@@ -808,6 +820,8 @@ def download_and_convert(
         tracker.finished_bytes = 0
         try:
             with yt_dlp.YoutubeDL(options) as ydl:
+                if features.title:
+                    ydl.add_post_processor(_SetTitlePP(features.title), when="pre_process")
                 result = ydl.extract_info(url, download=True) or {}
             break
         except yt_dlp.utils.DownloadCancelled as exc:

@@ -469,7 +469,9 @@ def _run_item(job: Job, item: Item) -> None:
         with job.lock:
             job.block_streak = job.network_streak = 0
         if item.url:
-            history.add(item.title, item.url, job.fmt, job.quality, item.filename)
+            history.add(
+                job.features.title or item.title, item.url, job.fmt, job.quality, item.filename
+            )
             pending.mark_done(job.id, item.number or item.index)
     except downloader.Cancelled:
         item.status = "skipped"

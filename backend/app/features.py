@@ -8,6 +8,7 @@ from . import formats
 _TIME_RE = re.compile(r"^(?:(\d+):)?(?:(\d+):)?(\d+(?:\.\d+)?)$")
 _LANG_RE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?$")
 MAX_SUBTITLE_LANGUAGES = 5
+MAX_TITLE_LENGTH = 150
 
 
 def parse_timestamp(text: str | None) -> float | None:
@@ -36,6 +37,7 @@ class Features:
     trim_start: float | None = None
     trim_end: float | None = None
     split_chapters: bool = False  # one file per chapter, delivered as a ZIP
+    title: str | None = None  # a name of the person's own, for single links
 
     @property
     def trimmed(self) -> bool:
@@ -79,6 +81,12 @@ def parse(data: dict | None, fmt: str, single: bool) -> Features:
     if split and preset:
         raise ValueError("Splitting by chapter is not available for the car presets.")
 
+    title = re.sub(r"[\x00-\x1f\x7f]", " ", str(data.get("title") or "")).strip()
+    if title and not single:
+        raise ValueError("Renaming works on one video at a time.")
+    if len(title) > MAX_TITLE_LENGTH:
+        raise ValueError(f"Keep the title under {MAX_TITLE_LENGTH} characters.")
+
     wants_subtitles = bool(data.get("subtitles")) and video and not preset
     return Features(
         normalize=bool(data.get("normalize")),
@@ -88,4 +96,5 @@ def parse(data: dict | None, fmt: str, single: bool) -> Features:
         trim_start=start,
         trim_end=end,
         split_chapters=split,
+        title=title or None,
     )

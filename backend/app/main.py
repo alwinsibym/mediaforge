@@ -275,14 +275,21 @@ async def create_upload_job(
     quality: str | None = Form(None),
     mute: bool = Form(False),
     normalize: bool = Form(False),
+    title: str = Form(""),
 ) -> dict:
     """Upload a file and convert it in the background, with live progress."""
     try:
         fmt, quality = formats.normalize(format, quality)
     except ValueError as exc:
         raise _bad_request(exc) from exc
+    original = file.filename or "upload"
+    try:
+        wanted = features.parse({"title": title}, fmt, single=True).title
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+    name = f"{wanted}{Path(original).suffix}" if wanted else original
     job, destination = jobs.prepare_upload_job(
-        file.filename or "upload", fmt, quality, mute, features.Features(normalize=normalize)
+        name, fmt, quality, mute, features.Features(normalize=normalize)
     )
     try:
         await _save_upload(file, destination)

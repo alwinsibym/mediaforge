@@ -574,3 +574,25 @@ def test_the_retry_button_replaces_the_pending_entry(monkeypatch, tmp_path, clie
     }
     assert client.post("/api/jobs", json=body).status_code == 200
     assert pending.get(first.id) is None
+
+
+# ---- custom title ----
+
+
+def test_title_parsed_for_single_only():
+    from app import features as fm
+
+    assert fm.parse({"title": "  My song  "}, "mp3", single=True).title == "My song"
+    assert fm.parse({"title": ""}, "mp3", single=True).title is None
+    with pytest.raises(ValueError):
+        fm.parse({"title": "x"}, "mp3", single=False)
+    with pytest.raises(ValueError):
+        fm.parse({"title": "x" * 200}, "mp3", single=True)
+
+
+def test_set_title_postprocessor_replaces_title():
+    from app import downloader
+
+    pp = downloader._SetTitlePP("Road (live) | 100%")
+    _, info = pp.run({"title": "old", "id": "x"})
+    assert info["title"] == "Road (live) | 100%"

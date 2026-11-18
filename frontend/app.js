@@ -78,6 +78,8 @@ const els = {
   preview: $("preview"),
   previewThumb: $("preview-thumb"),
   previewTitle: $("preview-title"),
+  titleInput: $("title-input"),
+  fileTitleInput: $("file-title-input"),
   previewMeta: $("preview-meta"),
   previewQuality: $("preview-quality"),
   thumbTools: $("thumb-tools"),
@@ -623,6 +625,7 @@ function resetPreview() {
   clearTimeout(state.previewTimer);
   state.info = null;
   state.previewedUrl = "";
+  els.titleInput.value = "";
   els.preview.hidden = true;
   els.thumbTools.hidden = true;
   if (state.catalogue) {
@@ -655,6 +658,8 @@ function formatUploadDate(text) {
 function showPreview(info) {
   state.info = info;
   els.previewTitle.textContent = info.title;
+  els.titleInput.value = "";
+  els.titleInput.placeholder = info.title;
   els.previewMeta.textContent = [
     info.uploader,
     formatDuration(info.duration),
@@ -1130,7 +1135,7 @@ async function startLinkJob() {
       save_to_folder: false,
       make_zip: false,
       deliver_to_browser: true,
-      options: collectOptions(),
+      options: { ...collectOptions(), title: els.titleInput.value.trim() },
     }),
   });
   if (!response.ok) throw await problemFrom(response);
@@ -1151,6 +1156,7 @@ function startFileJob() {
   if (currentQuality()) data.append("quality", currentQuality());
   data.append("mute", String(isMuted()));
   data.append("normalize", String(els.optNormalize.checked));
+  data.append("title", els.fileTitleInput.value.trim());
 
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();

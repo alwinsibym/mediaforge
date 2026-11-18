@@ -99,6 +99,10 @@
               <p id="preview-title" class="preview-title"></p>
               <p id="preview-meta" class="preview-meta"></p>
               <p id="preview-quality" class="preview-meta"></p>
+              <div class="mini-field rename">
+                <label for="title-input">File name and title</label>
+                <input id="title-input" type="text" maxlength="150" autocomplete="off" placeholder="Leave empty to keep the original title">
+              </div>
               <details id="thumb-tools" class="thumb-tools" hidden>
                 <summary>Download thumbnail</summary>
                 <div class="thumb-row">
@@ -126,6 +130,10 @@
             <span id="dropzone-text" class="dropzone-text">Choose an audio or video file, or drop it here</span>
             <span id="dropzone-hint" class="dropzone-hint"></span>
           </label>
+          <div class="mini-field rename">
+            <label for="file-title-input">New file name</label>
+            <input id="file-title-input" type="text" maxlength="150" autocomplete="off" placeholder="Leave empty to keep the original name">
+          </div>
         </section>
 
         <section id="panel-playlist" class="panel" role="tabpanel" aria-labelledby="tab-playlist" hidden>
