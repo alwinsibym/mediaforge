@@ -26,6 +26,8 @@ It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), 
 - Optional extras: even out the volume, skip sponsor segments (YouTube), embed subtitles, download only part of a video, split by chapter into a ZIP.
 - Sites that need a sign-in (Reddit, age-restricted YouTube, YouTube's "confirm you're not a bot") work by using the sign-in of a browser on your computer, chosen in Settings.
 - History of finished downloads with Use again, and a button that updates yt-dlp.
+- Every error has a plain-English title, a code such as `MF-NET-01` and an expandable explanation of what happened, why, and what to do next (the codes are listed in `backend/app/errors.py`).
+- Rename a single link or an uploaded file before converting; the new name is used for the file and the title tag.
 - Dark, Light or System theme (the default follows your device), chosen with the toggle in the header and remembered in your browser.
 - Responsive layout.
 
@@ -273,6 +275,8 @@ mediaforge/
 ## Responsible use
 
 MediaForge is for personal use with content you own, content under a licence that permits copying (such as Creative Commons), or other material you have the right to download. Many sites, including YouTube, restrict downloading in their terms of service, and copyright law applies. You are responsible for how you use this tool. It is designed to run locally and is not intended to be hosted as a public conversion service.
+
+This project was made for learning and experimenting. It is kept on GitHub as source code and documentation only, with no public website or hosted service, and it is meant to be run by each person on their own computer. See [docs/TESTING.md](docs/TESTING.md) for the checklist used to test it, [docs/RELEASING.md](docs/RELEASING.md) for how versions work, and [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 ## Licence
 
