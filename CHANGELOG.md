@@ -6,6 +6,9 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- The page code is split from one `app.js` into ES modules in `frontend/js/`, checked by a browser smoke test (`scripts/ui_smoke.py`) and ESLint, both run in CI.
+
 ### Added
 - Settings: a proxy field and "imitate Chrome's connection" (needs `curl_cffi`).
 - Links to private addresses (127.0.0.1, 192.168.x.x, localhost) are blocked, with an override.
