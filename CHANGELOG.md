@@ -4,7 +4,7 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [0.3.0]
 
 ### Changed
 - The page code is split from one `app.js` into ES modules in `frontend/js/`, checked by a browser smoke test (`scripts/ui_smoke.py`) and ESLint, both run in CI.
