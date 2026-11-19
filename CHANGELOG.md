@@ -12,6 +12,8 @@ All notable changes to MediaForge are listed here. The format follows
 - Optional access token (`MEDIAFORGE_TOKEN`) for use with `--lan`.
 - A limit on jobs waiting or running at once.
 - Error codes MF-NET-04 (certificates), MF-SEC-01, MF-AUTH-01 and MF-LIM-04.
+- `scripts/selftest.py` (every format on generated media) and `scripts/check_sites.py` (a site report).
+- `MF-SITE-09` for sites that block your network address, such as Reddit's "Your IP address is unable to access the Reddit API".
 - Test coverage reporting in CI, CI and licence badges, and `CONTRIBUTING.md`.
 
 ## [0.2.0]

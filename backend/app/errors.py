@@ -125,9 +125,29 @@ CATALOG: dict[str, dict] = {
         ],
         "fix": [
             "Try again in a moment. MediaForge already retried a few times.",
+            "For a short Reddit link (reddit.com/r/.../s/...), open it in your browser and paste "
+            "the full address from the address bar instead.",
             "Choose your browser under Settings, so requests carry your sign-in.",
             "Update yt-dlp from Settings.",
             "Turn a VPN off or on and try again.",
+        ],
+    },
+    "MF-SITE-09": {
+        "title": "The site blocks your internet address",
+        "summary": "The site refuses every request that comes from this network address.",
+        "what": "Some sites (Reddit is the usual one) block whole ranges of addresses, such as "
+        "college and office networks, VPNs and shared connections. The block is on the address, "
+        "so being signed in does not change it.",
+        "why": [
+            "You are on a college, office or public network that the site has blocked.",
+            "A VPN or proxy uses an address the site has blocked.",
+            "Too many automatic requests came from this address.",
+        ],
+        "fix": [
+            "Try another network, such as your phone's hotspot.",
+            "Turn your VPN off, or switch it to another server.",
+            "Set a proxy under Settings if you have one you trust.",
+            "Try again later: these blocks often lift after a few hours.",
         ],
     },
     "MF-SITE-04": {
@@ -382,6 +402,8 @@ def classify(message: str) -> str:
         return "MF-SITE-07"
     if has("unsupported url"):
         return "MF-SITE-06"
+    if has("unable to access the reddit api", "your ip address", "ip address is blocked"):
+        return "MF-SITE-09"
     if has("403", "forbidden", "http error 401"):
         return "MF-SITE-03"
     if has(

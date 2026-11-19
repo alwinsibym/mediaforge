@@ -218,6 +218,8 @@ Set these environment variables before starting the server (or in `docker-compos
 
 ## Development
 
+Two scripts check the app without any setup: `python scripts/selftest.py` converts generated media to every format and verifies the result, and `python scripts/check_sites.py sites.txt` writes a report of which sites work. See [docs/TESTING.md](docs/TESTING.md).
+
 ```bash
 cd backend
 pip install -r requirements-dev.txt

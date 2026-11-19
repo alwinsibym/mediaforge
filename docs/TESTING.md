@@ -9,6 +9,19 @@ your own uploads).
 
 Version tested: ________  Date: ________  Computer / internet speed: ________
 
+## 0. What can be automated
+
+| Check | How | Needs you? |
+| --- | --- | --- |
+| Logic, errors, settings, security (230+ tests) | `pytest` and GitHub Actions on every push | No |
+| Every output format on real media, with timings | `python scripts/selftest.py` (FFmpeg only, no internet) | No |
+| Which sites work, with the error code of each failure | `python scripts/check_sites.py sites.txt` writes `site-report.md` | A list of links you may copy |
+| Speed and 10-minute video timings (section 4) | Run the app with your own link and write the times | Yes |
+| Sony head unit, phone on Wi-Fi, antivirus, internet cut | Cannot be automated | Yes |
+
+Run `selftest.py` after every change to FFmpeg, yt-dlp or the conversion code, and
+`check_sites.py` after every yt-dlp update. Copy `scripts/sites.example.txt` to `sites.txt` first.
+
 ## 1. Automatic checks
 
 - [ ] `cd backend && python -m ruff check .` passes
@@ -114,12 +127,12 @@ Mark each site with what happens today. Sites change often, so repeat after a yt
 
 | Site | Result | Notes |
 | --- | --- | --- |
-| YouTube (public video) | Works | Playlists may trigger the bot check; sign in through Firefox helps |
+| YouTube (public video, Shorts) | Works | All formats, rename and subtitles tested on 2026-11-19. Playlists may trigger the bot check; a Firefox sign-in helps |
 | YouTube (age-restricted) | ______ | Needs a browser sign-in |
 | Instagram (reels) | Works | |
 | X / Twitter (normal video) | Works | |
-| X / Twitter (adult or sensitive video) | Fails: "no video could be found" | Needs a signed-in cookie from a browser (MF-SITE-04, MF-SITE-02) |
-| Reddit | Fails: 403 | Needs a browser sign-in, an updated yt-dlp, and sometimes more (MF-SITE-03) |
+| X / Twitter (adult or sensitive video) | Works with a Firefox sign-in | Without a sign-in: "no video could be found" (MF-SITE-04) |
+| Reddit | Fails even when signed in (Chrome, Brave, Firefox) | Short `/s/` link: 403 Blocked (MF-SITE-03). Full link: "Your IP address is unable to access the Reddit API" (MF-SITE-09). The block is on the network address: try a phone hotspot or another network |
 | Facebook | ______ | |
 | TikTok | ______ | |
 | Vimeo | ______ | |

@@ -737,6 +737,8 @@ function onUrlInput() {
   if (url !== state.previewedUrl) {
     state.info = null;
     els.preview.hidden = true;
+    // A new link means the last result (done or failed) is no longer the story.
+    if (!state.busy) setStatus("");
     if (state.catalogue) {
       renderQualityOptions();
       renderSpec();
