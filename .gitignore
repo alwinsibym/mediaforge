@@ -34,3 +34,5 @@ Thumbs.db
 data/
 cookies*.txt
 *.cookies
+sites.txt
+site-report.md
