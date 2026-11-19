@@ -138,6 +138,7 @@ def start_job(
         raise ValueError("Select at least one video.")
     if len(items) > config.MAX_PLAYLIST_ITEMS:
         raise ValueError(f"A job can hold at most {config.MAX_PLAYLIST_ITEMS} videos.")
+    _check_capacity()
 
     cleaned = [
         Item(
@@ -215,6 +216,17 @@ def _number(value, fallback: int) -> int:
     return number if 1 <= number <= 9999 else fallback
 
 
+def _check_capacity() -> None:
+    """Refuse new work while too many jobs are waiting or running."""
+    with _lock:
+        busy = sum(1 for job in _jobs.values() if job.status in ("queued", "running", "uploading"))
+    if busy >= config.MAX_ACTIVE_JOBS:
+        raise ConversionError(
+            f"MediaForge already has {busy} jobs in progress. Wait for one to finish or cancel it.",
+            "MF-LIM-04",
+        )
+
+
 def _register(job: Job) -> None:
     with _lock:
         _jobs[job.id] = job
@@ -239,6 +251,7 @@ def prepare_upload_job(
 
     Call `submit_upload` once the file is saved, or `discard` if the upload fails.
     """
+    _check_capacity()
     name = validators.safe_filename(filename, default="upload")
     staging = Path(tempfile.mkdtemp(prefix="mediaforge-job-"))
     destination = staging / "upload" / name

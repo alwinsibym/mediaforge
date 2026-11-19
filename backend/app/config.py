@@ -39,3 +39,13 @@ DATA_DIR = Path(
 # Set to 1 only when every client that can reach the server is trusted (the Docker setup binds
 # the port to this computer). Settings, history and updates are otherwise limited to loopback.
 TRUST_ALL_CLIENTS = os.getenv("MEDIAFORGE_TRUST_CLIENTS") == "1"
+
+# Jobs that may be waiting or running at once. Jobs run one after another, so extra requests
+# only queue up and use disk space.
+MAX_ACTIVE_JOBS = int(os.getenv("MEDIAFORGE_MAX_ACTIVE_JOBS", "5"))
+
+# Set to 1 to allow links to addresses inside your own network (127.0.0.1, 192.168.x.x ...).
+ALLOW_PRIVATE_URLS = os.getenv("MEDIAFORGE_ALLOW_PRIVATE") == "1"
+
+# An access token. When set, every device except this computer must enter it first.
+ACCESS_TOKEN = os.getenv("MEDIAFORGE_TOKEN", "")

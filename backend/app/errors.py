@@ -238,6 +238,41 @@ CATALOG: dict[str, dict] = {
         "why": ["The limit protects your disk and memory."],
         "fix": ["Use a smaller file, or raise MEDIAFORGE_MAX_UPLOAD_MB and restart."],
     },
+    "MF-LIM-04": {
+        "title": "Too many conversions waiting",
+        "summary": "MediaForge already has the maximum number of jobs in progress.",
+        "what": "Jobs run one after another. To protect your disk and memory, new ones are "
+        "refused while this many are waiting or running.",
+        "why": ["Several downloads were started in a row."],
+        "fix": [
+            "Wait for a running job to finish, or cancel one, then start this again.",
+            "Raise MEDIAFORGE_MAX_ACTIVE_JOBS and restart if you need more.",
+        ],
+    },
+    "MF-SEC-01": {
+        "title": "That address is on your own network",
+        "summary": "The link points to this computer or to a device in your local network.",
+        "what": "MediaForge refuses links such as http://127.0.0.1/... or http://192.168.1.5/... "
+        "so that a page opened from another device cannot use MediaForge to reach your "
+        "router, printer or other private services.",
+        "why": [
+            "The link uses localhost or a private address.",
+            "The site's name resolves to a private address (some VPNs and filters do this).",
+        ],
+        "fix": [
+            "Use the public link of the video.",
+            "If you really mean a server in your own network, set MEDIAFORGE_ALLOW_PRIVATE=1 "
+            "and restart MediaForge.",
+        ],
+    },
+    "MF-AUTH-01": {
+        "title": "Access token needed",
+        "summary": "This MediaForge asks for an access token.",
+        "what": "The person who started MediaForge set a token. Devices other than that computer "
+        "must enter it once.",
+        "why": ["MEDIAFORGE_TOKEN is set on the computer running MediaForge."],
+        "fix": ["Enter the token you were given, or ask the person who runs MediaForge."],
+    },
     "MF-TOOL-01": {
         "title": "FFmpeg is missing",
         "summary": "FFmpeg was not found on this computer.",

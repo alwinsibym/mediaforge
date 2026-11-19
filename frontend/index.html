@@ -326,6 +326,17 @@
     </div>
   </footer>
 
+  <dialog id="login-dialog" class="dialog" aria-labelledby="login-title">
+    <form id="login-form" class="dialog-body">
+      <h2 id="login-title">Access token needed</h2>
+      <p class="hint">The person who runs this MediaForge set an access token. Enter it once on this device.</p>
+      <div class="mini-field"><label for="login-token">Access token</label>
+        <input id="login-token" type="password" autocomplete="current-password" required></div>
+      <p id="login-status" class="status" role="status"></p>
+      <div class="dialog-actions"><button type="submit" class="btn btn-primary">Continue</button></div>
+    </form>
+  </dialog>
+
   <dialog id="settings-dialog" class="dialog" aria-labelledby="settings-title">
     <form id="settings-form" class="dialog-body">
       <h2 id="settings-title">Settings</h2>
@@ -347,6 +358,15 @@
         <p class="hint">Two is a good start. Choose 1 if YouTube keeps asking for a sign-in check.</p>
         <label class="check"><input type="checkbox" id="set-aria2c"><span>Use aria2c for more connections per file</span></label>
         <p id="aria-hint" class="hint"></p>
+      </section>
+
+      <section class="dialog-section">
+        <h3>Connection</h3>
+        <div class="mini-field"><label for="set-proxy">Proxy (optional)</label>
+          <input id="set-proxy" type="text" autocomplete="off" spellcheck="false" placeholder="socks5://127.0.0.1:1080"></div>
+        <p class="hint">Sends requests through a proxy you control or trust, such as one from your own VPN app. Leave it empty to connect directly. A proxy can see the sites you visit.</p>
+        <label class="check"><input type="checkbox" id="set-impersonate"><span>Imitate Chrome's connection</span></label>
+        <p id="impersonate-hint" class="hint"></p>
       </section>
 
       <section class="dialog-section">

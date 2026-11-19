@@ -1,5 +1,6 @@
 """MediaForge API: convert media from a URL or an uploaded file."""
 
+import hmac
 import importlib.metadata
 import shutil
 import subprocess
@@ -90,6 +91,60 @@ async def _api_error(_request: Request, exc: ApiError):
     return JSONResponse({"detail": exc.detail, "error": exc.info}, status_code=exc.status_code)
 
 
+TOKEN_COOKIE = "mf_token"
+_OPEN_PATHS = {"/api/health", "/api/login"}
+
+
+def _is_local(request: Request) -> bool:
+    return request.client is not None and request.client.host in _LOCAL_CLIENTS
+
+
+def _authorised(request: Request) -> bool:
+    """True when no token is set, the client is this computer, or it sent the right token."""
+    if not config.ACCESS_TOKEN or _is_local(request):
+        return True
+    given = request.cookies.get(TOKEN_COOKIE, "")
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith("bearer "):
+        given = header[7:].strip()
+    return hmac.compare_digest(given.encode(), config.ACCESS_TOKEN.encode())
+
+
+@app.middleware("http")
+async def _require_token(request: Request, call_next):
+    path = request.url.path
+    if path.startswith("/api/") and path not in _OPEN_PATHS and not _authorised(request):
+        return JSONResponse(
+            {
+                "detail": "This MediaForge asks for an access token.",
+                "error": errors.describe("MF-AUTH-01"),
+                "auth_required": True,
+            },
+            status_code=401,
+        )
+    return await call_next(request)
+
+
+@app.post("/api/login")
+def login(body: dict, request: Request) -> JSONResponse:
+    """Check the access token and remember it in a cookie for this browser."""
+    given = str(body.get("token") or "")
+    if config.ACCESS_TOKEN and not hmac.compare_digest(
+        given.encode(), config.ACCESS_TOKEN.encode()
+    ):
+        raise HTTPException(status_code=401, detail="That token is not correct.")
+    response = JSONResponse({"ok": True})
+    if config.ACCESS_TOKEN:
+        response.set_cookie(
+            TOKEN_COOKIE,
+            given,
+            httponly=True,
+            samesite="strict",
+            max_age=30 * 24 * 3600,
+        )
+    return response
+
+
 def _bad_request(exc: Exception) -> HTTPException:
     return ApiError(400, str(exc), errors.describe_exception(exc))
 
@@ -108,7 +163,7 @@ def _file_response(path: Path, workdir: str) -> FileResponse:
 
 
 @app.get("/api/health")
-def health() -> dict:
+def health(request: Request) -> dict:
     return {
         "status": "ok",
         "version": __version__,
@@ -117,6 +172,8 @@ def health() -> dict:
         "js_runtimes": sorted(downloader.js_runtimes()),
         "yt_dlp": _ytdlp_version(),
         "aria2c": downloader.aria2c_available(),
+        "auth_required": bool(config.ACCESS_TOKEN),
+        "authorised": _authorised(request),
     }
 
 
@@ -261,7 +318,7 @@ def create_job(body: JobRequest) -> dict:
             earlier.folder if earlier else None,
             body.options,
         )
-    except ValueError as exc:
+    except (ValueError, ConversionError) as exc:
         raise _bad_request(exc) from exc
     if body.continue_job:
         pending.remove(body.continue_job)  # its leftovers now belong to the new job
@@ -288,9 +345,12 @@ async def create_upload_job(
     except ValueError as exc:
         raise _bad_request(exc) from exc
     name = f"{wanted}{Path(original).suffix}" if wanted else original
-    job, destination = jobs.prepare_upload_job(
-        name, fmt, quality, mute, features.Features(normalize=normalize)
-    )
+    try:
+        job, destination = jobs.prepare_upload_job(
+            name, fmt, quality, mute, features.Features(normalize=normalize)
+        )
+    except ConversionError as exc:
+        raise _bad_request(exc) from exc
     try:
         await _save_upload(file, destination)
     except ConversionError as exc:
@@ -382,6 +442,7 @@ def _settings_payload() -> dict:
         "cookie_browsers": list(settings.COOKIE_BROWSERS),
         "max_parallel": settings.MAX_PARALLEL,
         "aria2c_installed": downloader.aria2c_available(),
+        "impersonation_installed": downloader.impersonation_available(),
     }
 
 

@@ -59,6 +59,9 @@ const els = {
   setParallel: $("set-parallel"),
   setAria2c: $("set-aria2c"),
   ariaHint: $("aria-hint"),
+  setProxy: $("set-proxy"),
+  setImpersonate: $("set-impersonate"),
+  impersonateHint: $("impersonate-hint"),
   ytdlpVersion: $("ytdlp-version"),
   ytdlpUpdate: $("ytdlp-update"),
   ytdlpResult: $("ytdlp-result"),
@@ -784,6 +787,48 @@ function showSelectedFile() {
   els.dropzoneHint.textContent = formatSize(file.size);
 }
 
+/* When the computer running MediaForge set an access token, other devices enter it once. */
+async function ensureLoggedIn() {
+  try {
+    const response = await fetch("/api/health");
+    const health = await response.json();
+    if (!health.auth_required || health.authorised) return;
+  } catch (_) {
+    return;
+  }
+  const dialog = $("login-dialog");
+  dialog.addEventListener("cancel", (event) => event.preventDefault());
+  await new Promise((resolve) => {
+    $("login-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const status = $("login-status");
+      status.className = "status";
+      status.textContent = "";
+      try {
+        const response = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: $("login-token").value }),
+        });
+        if (!response.ok) throw await problemFrom(response);
+        dialog.close();
+        resolve();
+      } catch (error) {
+        status.className = "status is-error";
+        status.textContent = error.message || "That token did not work.";
+      }
+    });
+    dialog.showModal();
+  });
+}
+
+async function startUp() {
+  await ensureLoggedIn();
+  loadFormats();
+  checkSetup();
+  revealLocalTools();
+}
+
 function setupDropzone() {
   els.fileInput.addEventListener("change", showSelectedFile);
 
@@ -1352,6 +1397,12 @@ async function openSettings() {
     els.ariaHint.textContent = saved.aria2c_installed
       ? "aria2c was found. The progress bar cannot show a percentage while it is used."
       : "aria2c is not installed. On Windows: winget install aria2.aria2, then open this window again.";
+    els.setProxy.value = saved.proxy || "";
+    els.setImpersonate.checked = saved.impersonate && saved.impersonation_installed;
+    els.setImpersonate.disabled = !saved.impersonation_installed;
+    els.impersonateHint.textContent = saved.impersonation_installed
+      ? "Can help with sites that refuse downloaders (some Reddit and Cloudflare-protected pages)."
+      : "Needs the curl_cffi package: run  pip install curl_cffi  then restart MediaForge.";
     els.ytdlpVersion.textContent = health.yt_dlp ? `Installed: yt-dlp ${health.yt_dlp}.` : "";
     els.settingsDialog.showModal();
   } catch (error) {
@@ -1372,6 +1423,8 @@ async function saveSettings(event) {
         cookies_file: els.setCookies.value.trim(),
         parallel: Number(els.setParallel.value),
         aria2c: els.setAria2c.checked,
+        proxy: els.setProxy.value.trim(),
+        impersonate: els.setImpersonate.checked,
       }),
     });
     if (!response.ok) throw await problemFrom(response);
@@ -1629,6 +1682,4 @@ els.form.addEventListener("submit", onSubmit);
 
 buildWave();
 setupDropzone();
-loadFormats();
-checkSetup();
-revealLocalTools();
+startUp();

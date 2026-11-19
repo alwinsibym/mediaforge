@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from pathlib import Path
+from urllib.parse import urlparse
 
 from . import config
 
@@ -15,7 +16,10 @@ DEFAULTS = {
     "cookies_file": "",  # or a cookies.txt file
     "parallel": 2,  # playlist videos downloaded at the same time
     "aria2c": False,  # use aria2c (if installed) for more connections per file
+    "proxy": "",  # send requests through this proxy, such as socks5://127.0.0.1:1080
+    "impersonate": False,  # present requests like Chrome (needs the curl_cffi package)
 }
+PROXY_SCHEMES = ("http", "https", "socks4", "socks5", "socks5h")
 
 _lock = threading.Lock()
 
@@ -64,7 +68,28 @@ def validate(update: dict) -> dict:
         clean["parallel"] = value
     if "aria2c" in update:
         clean["aria2c"] = bool(update["aria2c"])
+    if "proxy" in update:
+        clean["proxy"] = _check_proxy(str(update["proxy"] or ""))
+    if "impersonate" in update:
+        clean["impersonate"] = bool(update["impersonate"])
     return clean
+
+
+def _check_proxy(raw: str) -> str:
+    raw = raw.strip()
+    if not raw:
+        return ""
+    parsed = urlparse(raw)
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
+    if parsed.scheme not in PROXY_SCHEMES or not parsed.hostname or port is None:
+        raise ValueError(
+            "A proxy looks like http://host:port or socks5://host:port. "
+            "Leave it empty to connect directly."
+        )
+    return raw
 
 
 def save(update: dict) -> dict:

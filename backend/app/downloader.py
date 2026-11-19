@@ -230,7 +230,18 @@ def _base_options() -> dict:
         options["cookiefile"] = saved["cookies_file"]
     elif saved["cookies_browser"]:
         options["cookiesfrombrowser"] = (saved["cookies_browser"],)
+    if saved["proxy"]:
+        options["proxy"] = saved["proxy"]
+    if saved["impersonate"] and impersonation_available():
+        from yt_dlp.networking.impersonate import ImpersonateTarget
+
+        options["impersonate"] = ImpersonateTarget.from_str("chrome")
     return options
+
+
+def impersonation_available() -> bool:
+    """True when the optional curl_cffi package is installed."""
+    return importlib.util.find_spec("curl_cffi") is not None
 
 
 def aria2c_available() -> bool:
