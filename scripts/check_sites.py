@@ -63,6 +63,12 @@ def main() -> int:
         for line in Path(args.file).read_text(encoding="utf-8").splitlines()
         if line.strip() and not line.startswith("#")
     ]
+    if not urls:
+        print(
+            f"No links found in {args.file}. Lines that start with # are ignored: put a real "
+            "video link on its own line and remove the # in front of it."
+        )
+        return 2
     rows = []
     for url in urls:
         result, note, seconds = check(url, args.download)
