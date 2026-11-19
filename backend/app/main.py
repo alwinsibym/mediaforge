@@ -27,6 +27,7 @@ from . import (
     history,
     jobs,
     pending,
+    runtime,
     settings,
     transcoder,
     validators,
@@ -162,6 +163,16 @@ def _file_response(path: Path, workdir: str) -> FileResponse:
     )
 
 
+@app.post("/api/quit")
+def quit_app(request: Request) -> dict:
+    """Stop MediaForge. Only the computer running it may do this."""
+    _local_only(request)
+    if runtime.SERVER is None:
+        raise HTTPException(status_code=409, detail="MediaForge was not started with run.py.")
+    runtime.SERVER.should_exit = True
+    return {"ok": True}
+
+
 @app.get("/api/health")
 def health(request: Request) -> dict:
     return {
@@ -174,6 +185,7 @@ def health(request: Request) -> dict:
         "aria2c": downloader.aria2c_available(),
         "auth_required": bool(config.ACCESS_TOKEN),
         "authorised": _authorised(request),
+        "can_quit": runtime.SERVER is not None and _is_local(request),
     }
 
 

@@ -110,6 +110,18 @@ Open <http://localhost:8000>.
 
 To check that FFmpeg and the JavaScript runtime were found, open <http://localhost:8000/api/health>. It reports `"ffmpeg": true` and lists the detected runtimes under `js_runtimes`.
 
+### A desktop shortcut (no terminal)
+
+With your virtual environment active, run once:
+
+```
+python scripts/create_shortcut.py
+```
+
+It puts a **MediaForge** icon on your Desktop (add `--start-menu` for the Start Menu on Windows). Double-click it to start the server with no console window and open the page in your browser. If MediaForge is already running, it only opens the page. Use the power button at the top right of the page to stop it. Messages go to `data/mediaforge.log`. Remove the shortcut with `python scripts/create_shortcut.py --remove`.
+
+The Windows shortcut is tested only through its generated PowerShell, and the macOS `.command` file has not been tried, so report anything odd.
+
 ## Usage
 
 1. Choose the **Link**, **File** or **Playlist** tab.

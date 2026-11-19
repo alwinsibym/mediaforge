@@ -4,6 +4,12 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+
+### Added
+- A desktop shortcut (`scripts/create_shortcut.py`) using the MediaForge logo as its icon. It starts the server without a console window, opens the browser, and reuses a copy that is already running.
+- `python run.py --open`, a Quit button in the page, and a log file at `data/mediaforge.log`.
+
 ## [0.3.0]
 
 ### Changed
