@@ -218,7 +218,7 @@ Set these environment variables before starting the server (or in `docker-compos
 
 ## Development
 
-Three scripts check the app: `python scripts/ui_smoke.py` clicks through every screen in a real browser (needs `pip install playwright` and `playwright install chromium`), `python scripts/selftest.py` converts generated media to every format and verifies the result, and `python scripts/check_sites.py sites.txt` writes a report of which sites work. See [docs/TESTING.md](docs/TESTING.md).
+Three scripts check the app: `python scripts/ui_smoke.py` clicks through every screen in a real browser (needs `pip install playwright` and `python -m playwright install chromium`), `python scripts/selftest.py` converts generated media to every format and verifies the result, and `python scripts/check_sites.py sites.txt` writes a report of which sites work. See [docs/TESTING.md](docs/TESTING.md).
 
 ```bash
 cd backend

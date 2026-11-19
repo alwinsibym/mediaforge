@@ -1,6 +1,6 @@
 """Click through the MediaForge page in a real browser and check that every screen still works.
 
-    pip install playwright && playwright install chromium
+    pip install playwright && python -m playwright install chromium
     python scripts/ui_smoke.py            # headless
     python scripts/ui_smoke.py --show     # watch it run
 
@@ -320,7 +320,11 @@ def main_cli() -> int:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("Install Playwright first: pip install playwright && playwright install chromium")
+        print(
+            "Install Playwright first:\n"
+            "  pip install playwright\n"
+            "  python -m playwright install chromium"
+        )
         return 2
     port = _start_server()
     with sync_playwright() as playwright:
