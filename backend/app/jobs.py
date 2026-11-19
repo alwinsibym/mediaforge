@@ -30,6 +30,9 @@ from . import (
 from . import (
     features as features_mod,
 )
+from . import (
+    tweaks as tweaks_mod,
+)
 from .downloader import BotCheckError, ConversionError, NetworkError
 
 MAX_KEPT_JOBS = 10
@@ -91,6 +94,9 @@ class Job:
     produced: list[Path] = field(default_factory=list)
     cancel_requested: bool = False
     features: features_mod.Features = field(default_factory=features_mod.Features)
+    tweaks: tweaks_mod.Tweaks = field(default_factory=tweaks_mod.Tweaks)
+    audio_file: Path | None = None
+    subtitle_file: Path | None = None
     parallel: int = 1  # items worked on at the same time
     blocked: bool = False  # the job stopped early because the site kept refusing or was unreachable
     blocked_reason: str = ""  # "sign-in" or "network"
@@ -246,6 +252,7 @@ def prepare_upload_job(
     quality: str,
     mute: bool,
     features: features_mod.Features | None = None,
+    tweaks: tweaks_mod.Tweaks | None = None,
 ) -> tuple[Job, Path]:
     """Create a job for a file that is about to be uploaded. Returns it and where to save it.
 
@@ -270,6 +277,7 @@ def prepare_upload_job(
         browser_download=True,
         status="uploading",
         features=features or features_mod.Features(),
+        tweaks=tweaks or tweaks_mod.Tweaks(),
     )
     _register(job)
     return job, destination
@@ -404,6 +412,9 @@ def _produce(job: Job, item: Item, workdir: Path, report, notes: list[str]) -> P
             job.mute,
             report,
             normalize=job.features.normalize,
+            tweaks=job.tweaks,
+            audio_file=job.audio_file,
+            subtitle_file=job.subtitle_file,
         )
     return downloader.download_and_convert(
         item.url,
