@@ -36,3 +36,4 @@ cookies*.txt
 *.cookies
 sites.txt
 site-report.md
+node_modules/

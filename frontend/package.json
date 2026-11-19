@@ -1,0 +1,12 @@
+{
+  "name": "mediaforge-frontend",
+  "private": true,
+  "description": "The MediaForge page. No build step: the browser loads js/main.js directly. This file only holds the lint tool.",
+  "scripts": {
+    "lint": "eslint js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
+  }
+}
