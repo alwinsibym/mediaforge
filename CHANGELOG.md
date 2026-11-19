@@ -4,6 +4,16 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+
+### Added
+- Settings: a proxy field and "imitate Chrome's connection" (needs `curl_cffi`).
+- Links to private addresses (127.0.0.1, 192.168.x.x, localhost) are blocked, with an override.
+- Optional access token (`MEDIAFORGE_TOKEN`) for use with `--lan`.
+- A limit on jobs waiting or running at once.
+- Error codes MF-NET-04 (certificates), MF-SEC-01, MF-AUTH-01 and MF-LIM-04.
+- Test coverage reporting in CI, CI and licence badges, and `CONTRIBUTING.md`.
+
 ## [0.2.0]
 
 ### Added

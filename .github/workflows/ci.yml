@@ -28,11 +28,13 @@ jobs:
 
       - name: Lint
         working-directory: backend
-        run: ruff check .
+        run: |
+          ruff check .
+          ruff format --check .
 
       - name: Test
         working-directory: backend
-        run: pytest -q
+        run: pytest -q --cov=app --cov-report=term-missing
 
   docker:
     runs-on: ubuntu-latest

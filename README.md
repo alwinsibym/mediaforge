@@ -1,5 +1,9 @@
 # MediaForge
 
+[![CI](https://github.com/alwinsibym/mediaforge/actions/workflows/ci.yml/badge.svg)](https://github.com/alwinsibym/mediaforge/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+
 A media converter that runs on your own machine. Paste a video URL or upload a local file, choose a format, and download the result as MP3, M4A, AAC, WAV, FLAC, OGG, Opus, MP4, WebM or MKV.
 
 It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [FFmpeg](https://ffmpeg.org/). No accounts, API keys or paid services.
@@ -26,6 +30,8 @@ It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), 
 - Optional extras: even out the volume, skip sponsor segments (YouTube), embed subtitles, download only part of a video, split by chapter into a ZIP.
 - Sites that need a sign-in (Reddit, age-restricted YouTube, YouTube's "confirm you're not a bot") work by using the sign-in of a browser on your computer, chosen in Settings.
 - History of finished downloads with Use again, and a button that updates yt-dlp.
+- Optional proxy and "imitate Chrome's connection" (needs `pip install curl_cffi`) in Settings, for networks or sites that refuse plain downloaders.
+- Safer on a network: links to private addresses are blocked, jobs are limited, and an optional access token protects `--lan` use.
 - Every error has a plain-English title, a code such as `MF-NET-01` and an expandable explanation of what happened, why, and what to do next (the codes are listed in `backend/app/errors.py`).
 - Rename a single link or an uploaded file before converting; the new name is used for the file and the title tag.
 - Dark, Light or System theme (the default follows your device), chosen with the toggle in the header and remembered in your browser.
@@ -51,7 +57,7 @@ The backend serves the frontend and a small JSON/file API. For a URL, it downloa
 Docker bundles Python, FFmpeg and the JavaScript runtime, so nothing else needs installing.
 
 ```bash
-git clone https://github.com/<your-username>/mediaforge.git
+git clone https://github.com/alwinsibym/mediaforge.git
 cd mediaforge
 docker compose up --build
 ```
@@ -73,7 +79,7 @@ Open <http://localhost:8000>.
    Windows (PowerShell):
 
    ```powershell
-   git clone https://github.com/<your-username>/mediaforge.git
+   git clone https://github.com/alwinsibym/mediaforge.git
    cd mediaforge\backend
    python -m venv .venv
    .venv\Scripts\Activate.ps1
@@ -85,7 +91,7 @@ Open <http://localhost:8000>.
    macOS / Linux:
 
    ```bash
-   git clone https://github.com/<your-username>/mediaforge.git
+   git clone https://github.com/alwinsibym/mediaforge.git
    cd mediaforge/backend
    python3 -m venv .venv
    source .venv/bin/activate
@@ -206,6 +212,9 @@ Set these environment variables before starting the server (or in `docker-compos
 | `MEDIAFORGE_TRUST_CLIENTS` | (off) | Set to `1` to let every client use Settings, History and updates (the Docker setup does, with its port limited to this computer) |
 | `MEDIAFORGE_FRONTEND_DIR` | `../frontend` | Folder served as the web UI |
 | `MEDIAFORGE_FFMPEG_DIR` | (auto-detect) | Folder containing `ffmpeg`, for when it is installed but not on the `PATH` |
+| `MEDIAFORGE_MAX_ACTIVE_JOBS` | `5` | Jobs allowed to wait or run at once; more are refused |
+| `MEDIAFORGE_ALLOW_PRIVATE` | (off) | Set to `1` to allow links to `127.0.0.1`, `192.168.x.x` and other private addresses (blocked by default) |
+| `MEDIAFORGE_TOKEN` | (none) | An access token. Devices other than this computer must enter it once. Use it whenever you start with `--lan` |
 
 ## Development
 

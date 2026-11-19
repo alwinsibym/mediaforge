@@ -146,6 +146,16 @@ For every failure, copy the technical details from the error card into the notes
 - [ ] Error messages do not show file paths from your computer, only technical details
 - [ ] `pip list --outdated` and `pip-audit` checked for known problems
 
+## 8b. Network and access
+
+- [ ] `http://127.0.0.1/x` and `http://192.168.x.x/x` as a link: blocked with MF-SEC-01
+- [ ] Start with `MEDIAFORGE_TOKEN=abc python run.py --lan`: a phone is asked for the token; this
+      computer is not
+- [ ] Wrong token is refused, right token is remembered after a reload
+- [ ] Start 6 jobs quickly: the 6th is refused with MF-LIM-04
+- [ ] Proxy field: a wrong proxy gives a clear network error, an empty one connects directly
+- [ ] After `pip install curl_cffi`, "Imitate Chrome's connection" can be ticked; try Reddit again
+
 ## 9. Before a release
 
 - [ ] CHANGELOG updated, `__version__` bumped
