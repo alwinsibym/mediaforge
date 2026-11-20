@@ -336,3 +336,26 @@ def test_formats_lists_tweaks(client):
 def test_mute_and_replacement_audio_conflict():
     with pytest.raises(ValueError, match="not both"):
         tweaks.parse({"mute": True}, "mp4", audio_file=True)
+
+
+def test_unreadable_ffmpeg_lists_keep_choices_enabled(monkeypatch):
+    monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
+    monkeypatch.setattr(tweaks.ffmpeg_locator, "find_tool", lambda name: "ffmpeg")
+    monkeypatch.setattr(tweaks, "_listing", lambda ffmpeg, flag: "")
+    caps = tweaks.capabilities()
+    assert all(caps["effects"].values()) and all(caps["video_codecs"].values())
+    assert tweaks._CAPS_CACHE is None  # not remembered, so the next request tries again
+
+
+def test_a_missing_filter_is_greyed_out(monkeypatch):
+    monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
+    monkeypatch.setattr(tweaks.ffmpeg_locator, "find_tool", lambda name: "ffmpeg")
+    filters = " T.. bass  A->A  Boost\n ... crossfeed  A->A  x\n"
+    encoders = " V....D libx264  H.264\n"
+    monkeypatch.setattr(
+        tweaks, "_listing", lambda ffmpeg, flag: encoders if flag == "-encoders" else filters
+    )
+    caps = tweaks.capabilities()
+    assert caps["effects"]["bass"] and not caps["effects"]["surround"]
+    assert caps["video_codecs"]["h264"] and not caps["video_codecs"]["h265"]
+    monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
