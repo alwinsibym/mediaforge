@@ -7,7 +7,6 @@ FFmpeg arguments, and file names never reach a filter string.
 import re
 import subprocess
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from . import ffmpeg_locator, formats
@@ -240,47 +239,66 @@ def parse(
 # ---------------------------------------------------------------- what this FFmpeg can do
 
 
-@lru_cache(maxsize=1)
+_CAPS_CACHE: dict | None = None
+
+
+def _listing(ffmpeg: str, flag: str) -> str:
+    try:
+        out = subprocess.run(
+            [ffmpeg, "-hide_banner", flag],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return out.stdout or ""
+
+
 def capabilities() -> dict:
-    """Which encoders and filters this FFmpeg has, so the page can disable what would fail."""
+    """Which encoders and filters this FFmpeg has, so the page can grey out what would fail.
+
+    If FFmpeg's list cannot be read (slow start, odd build), the matching choices stay enabled:
+    a real conversion still reports a clear error, which is better than hiding a working option.
+    A list that could not be read is not remembered, so the next request tries again.
+    """
+    global _CAPS_CACHE
+    if _CAPS_CACHE is not None:
+        return _CAPS_CACHE
     ffmpeg = ffmpeg_locator.find_tool("ffmpeg")
-    caps = {
-        "video_codecs": {name: False for name in VIDEO_CODECS},
-        "effects": {name: False for name in EFFECTS},
-        "subtitles_burn": False,
-        "animated": {"gif": False, "webp": False},
-    }
     if not ffmpeg:
-        return caps
-
-    def listing(flag: str) -> str:
-        try:
-            out = subprocess.run(
-                [ffmpeg, "-hide_banner", flag],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=30,
-            )
-            return out.stdout or ""
-        except (OSError, subprocess.TimeoutExpired):
-            return ""
-
-    encoders = set(re.findall(r"^\s*[VAS][\w.]{5}\s+(\S+)", listing("-encoders"), re.M))
-    filters = set(re.findall(r"^\s*[\w.]{3}\s+(\S+)\s", listing("-filters"), re.M))
-    caps["video_codecs"] = {
-        "h264": "libx264" in encoders,
-        "h265": "libx265" in encoders,
-        "vp9": "libvpx-vp9" in encoders,
-        "av1": "libsvtav1" in encoders or "libaom-av1" in encoders,
+        return {
+            "video_codecs": {name: False for name in VIDEO_CODECS},
+            "effects": {name: False for name in EFFECTS},
+            "subtitles_burn": False,
+            "animated": {"gif": False, "webp": False},
+        }
+    encoders_text = _listing(ffmpeg, "-encoders")
+    filters_text = _listing(ffmpeg, "-filters")
+    encoders = set(re.findall(r"^\s*[VAS][\w.]{5}\s+(\S+)", encoders_text, re.M))
+    filters = set(re.findall(r"^\s*[\w.]{2,3}\s+(\S+)\s+[AVN|]+->[AVN|]+", filters_text, re.M))
+    unknown_encoders = not encoders
+    unknown_filters = not filters
+    caps = {
+        "video_codecs": {
+            "h264": unknown_encoders or "libx264" in encoders,
+            "h265": unknown_encoders or "libx265" in encoders,
+            "vp9": unknown_encoders or "libvpx-vp9" in encoders,
+            "av1": unknown_encoders or "libsvtav1" in encoders or "libaom-av1" in encoders,
+        },
+        "effects": {
+            name: unknown_filters or flt in filters for name, flt in _EFFECT_FILTERS.items()
+        },
+        "subtitles_burn": unknown_filters or "subtitles" in filters,
+        "animated": {
+            "gif": unknown_filters or ("palettegen" in filters and "paletteuse" in filters),
+            "webp": unknown_encoders or "libwebp" in encoders or "libwebp_anim" in encoders,
+        },
     }
-    caps["effects"] = {name: flt in filters for name, flt in _EFFECT_FILTERS.items()}
-    caps["subtitles_burn"] = "subtitles" in filters
-    caps["animated"] = {
-        "gif": "palettegen" in filters and "paletteuse" in filters,
-        "webp": "libwebp" in encoders or "libwebp_anim" in encoders,
-    }
+    if encoders and filters:
+        _CAPS_CACHE = caps
     return caps
 
 

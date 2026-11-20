@@ -815,7 +815,7 @@ def download_and_convert(
         if start >= duration:
             raise ConversionError("The start time is after the end of the video.")
         duration = min(duration, features.trim_end or duration) - start
-    if duration and duration > config.MAX_DURATION_SECONDS:
+    if duration and config.MAX_DURATION_SECONDS and duration > config.MAX_DURATION_SECONDS:
         limit_min = config.MAX_DURATION_SECONDS // 60
         raise ConversionError(
             f"This video is longer than the {limit_min}-minute limit.", "MF-LIM-02"

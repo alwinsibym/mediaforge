@@ -111,8 +111,8 @@ Use the same 10-minute video each time and write the times.
 
 Note what is, and is not, covered. These are the facts to put in the README.
 
-- [ ] Maximum video length (default 60 minutes): changed with `MEDIAFORGE_MAX_DURATION`
-- [ ] Maximum upload size: changed with `MEDIAFORGE_MAX_UPLOAD_MB`
+- [ ] Maximum video length (default none; set seconds, 0 means no limit): changed with `MEDIAFORGE_MAX_DURATION`
+- [ ] Maximum upload size (default none; 0 means no limit): changed with `MEDIAFORGE_MAX_UPLOAD_MB`
 - [ ] Live streams are refused
 - [ ] DRM-protected video (Netflix, Prime Video, Disney+) cannot be downloaded: expected
 - [ ] Private videos need your own sign-in

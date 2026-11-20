@@ -137,10 +137,10 @@ def test_convert_file_rejects_unknown_format(client):
 
 
 def test_convert_file_enforces_size_limit(client, monkeypatch):
-    monkeypatch.setattr(config, "MAX_UPLOAD_MB", 0)
+    monkeypatch.setattr(config, "MAX_UPLOAD_MB", 1)
     response = client.post(
         "/api/convert-file",
-        files={"file": ("a.mp3", b"some bytes", "audio/mpeg")},
+        files={"file": ("a.mp3", b"x" * (2 * 1024 * 1024), "audio/mpeg")},
         data={"format": "wav"},
     )
     assert response.status_code == 400

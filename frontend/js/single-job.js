@@ -37,7 +37,7 @@ function startFileJob() {
   const file = els.fileInput.files[0];
   if (!file) return Promise.reject(new Error("Choose a file first."));
   const limitMb = state.catalogue.limits.max_upload_mb;
-  if (file.size > limitMb * 1024 * 1024) {
+  if (limitMb && file.size > limitMb * 1024 * 1024) {
     return Promise.reject(new Error(`That file is larger than the ${limitMb} MB limit.`));
   }
   const data = new FormData();
