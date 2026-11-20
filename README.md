@@ -8,7 +8,11 @@ A media converter that runs on your own machine. Paste a video URL or upload a l
 
 It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [FFmpeg](https://ffmpeg.org/). No accounts, API keys or paid services.
 
+![MediaForge demo: paste a link, pick MP3, convert and download](docs/demo.gif)
+
 ![MediaForge screenshot](docs/screenshot.png)
+
+[Watch the demo as a video](docs/demo.mp4)
 
 ## Features
 
@@ -176,6 +180,10 @@ When you paste a link, the Quality menu lists what that video offers, for exampl
 - **Download thumbnail** (under the video preview) saves the thumbnail in any size the site lists, as JPG, PNG or WebP, optionally cropped to a square.
 - **MP3 and M4A** files get a square cover and the title, artist and album. If a cover cannot be added, the page says so after the download.
 - **Remove the sound** (video formats) gives a silent video at the quality you picked.
+
+### Recording the demo
+
+`python scripts/record_demo.py https://youtu.be/VIDEO_ID` records the page in a real browser, runs a real download and writes `docs/demo.gif` and `docs/demo.mp4`. Use a video you own or that is licensed for copying. `--sample` uses made-up data and needs no internet.
 
 ### Using it from other devices
 
