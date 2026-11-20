@@ -828,3 +828,28 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 
 .stopped { text-align: center; padding: 20vh 16px; }
 .stopped h1 { margin: 0 0 8px; }
+
+/* Tweaks (File tab) */
+.tweaks { margin-top: 14px; }
+.tweaks .mini-field select, .tweaks .mini-field input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+}
+.tweaks .mini-field input[type="file"] { width: 100%; font: inherit; color: var(--muted); }
+.tweaks .mini-field label { display: block; margin-bottom: 4px; }
+.tw-group { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 12px 0 0; border: 0; border-top: 1px solid var(--line); }
+.tw-group[hidden], .tweaks [hidden] { display: none; }
+.tweaks .btn { justify-self: start; }
+.file-info { margin-top: 12px; padding: 12px 14px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; }
+.info-list { display: grid; gap: 6px; margin: 0; }
+.info-row { display: grid; grid-template-columns: 8.5rem 1fr; gap: 12px; }
+.info-row dt { color: var(--muted); }
+.info-row dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .info-row { grid-template-columns: 1fr; gap: 0; } }
+.info-btn { margin-top: 10px; }

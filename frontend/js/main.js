@@ -4,6 +4,7 @@ import { ensureLoggedIn } from "./auth.js";
 import { loadFormats, renderQualityOptions, renderSpec, selectKind } from "./catalog.js";
 import { els } from "./dom.js";
 import { updateExtras } from "./extras.js";
+import { wireTweaks } from "./tweaks.js";
 import { setupDropzone } from "./files.js";
 import { clearHistory, openHistory } from "./history.js";
 import { loadPlaylist, updateFolderHint, updatePlaylistSelection } from "./playlist.js";
@@ -74,6 +75,7 @@ els.chips.addEventListener("change", (event) => {
 });
 els.qualitySelect.addEventListener("change", renderSpec);
 els.optSubs.addEventListener("change", updateExtras);
+wireTweaks();
 
 els.urlInput.addEventListener("input", onUrlInput);
 els.urlInput.addEventListener("keydown", (event) => {

@@ -84,7 +84,22 @@ def _fake_download(
     return out
 
 
-def _fake_convert(source, fmt, quality, workdir, mute=False, progress=None, normalize=False):
+SEEN_TWEAKS = []
+
+
+def _fake_convert(
+    source,
+    fmt,
+    quality,
+    workdir,
+    mute=False,
+    progress=None,
+    normalize=False,
+    tweaks=None,
+    audio_file=None,
+    subtitle_file=None,
+):
+    SEEN_TWEAKS.append((fmt, tweaks, subtitle_file is not None))
     out = Path(workdir) / f"{Path(source).stem}.mp3"
     out.write_bytes(b"y" * 1024)
     return out
@@ -283,6 +298,50 @@ def run(playwright, base: str, show: bool) -> None:
         "Renamed clip" in upload.value.suggested_filename,
         upload.value.suggested_filename,
     )
+
+    # tweaks on the File tab
+    check("tweaks section is on the File tab", page.is_visible("#tweaks"))
+    page.click("#tweaks summary")
+    check(
+        "audio output hides the video-only tweaks",
+        not page.is_visible("#tw-codec-field") and not page.is_visible("#tw-animated-group"),
+    )
+    page.check("input[name=kind][value=video]")
+    page.wait_for_selector("#tw-codec-field", state="visible")
+    check(
+        "video output shows codec, resize and GIF tweaks",
+        page.is_visible("#tw-resize-field") and page.is_visible("#tw-animated-group"),
+    )
+    check(
+        "codecs that do not fit the container are disabled",
+        page.eval_on_selector('#tw-codec option[value="vp9"]', "o => o.disabled"),
+    )
+    page.select_option("#tw-resize", "480")
+    page.fill("#tw-volume", "150")
+    page.check("#tw-meta")
+    srt = _TMP / "x.srt"
+    srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
+    page.set_input_files("#tw-subs-file", str(srt))
+    check("subtitle mode appears once a file is chosen", page.is_visible("#tw-subs-mode"))
+    SEEN_TWEAKS.clear()
+    page.click("#submit-btn")
+    for _ in range(100):
+        if SEEN_TWEAKS:
+            break
+        time.sleep(0.1)
+    seen = SEEN_TWEAKS[-1] if SEEN_TWEAKS else None
+    tw = seen[1] if seen else None
+    check(
+        "tweaks reach the server",
+        bool(tw)
+        and tw.resize == 480
+        and tw.volume == 150
+        and tw.strip_metadata
+        and tw.subtitles == "soft"
+        and seen[2],
+        repr(seen),
+    )
+    page.check("input[name=kind][value=audio]")
 
     # phone layout
     phone = new_page(width=375)

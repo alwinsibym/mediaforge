@@ -143,6 +143,22 @@ The two buttons in the header open **History** (finished downloads, each with **
 
 If YouTube keeps asking for a sign-in check during a long playlist, MediaForge waits and retries, and if it keeps happening it stops and keeps what it saved. Choose **Retry** later and the failed videos are saved into the same folder with their original numbers.
 
+### Tweaks for your own files
+
+On the **File** tab, open **Tweaks** to change a file while converting it. Nothing is required; leave it closed for a plain conversion.
+
+- **Video codec**: H.264, H.265, VP9 or AV1 (the list greys out what your FFmpeg cannot do).
+- **Resize**: 360p up to 4K, up or down.
+- **Make it smaller than**: give a size in MB. MediaForge plans the bitrate for the clip length and retries if the first try was too big.
+- **Sound**: volume, fade in, fade out, and a sound effect (bass boost, treble boost, clearer voice, wider stereo, headphone crossfeed, virtual surround). "Even out the volume" is under More options. You can also replace the sound with another audio file, or tick "Remove the sound" for a silent video. Audio-only extraction is the Audio type.
+- **Subtitles**: add an .srt, .vtt or .ass file as a selectable track, or burn it into the picture.
+- **Start and stop**: keep only part of the file.
+- **Animated picture**: turn a clip of up to a minute into a GIF or an animated WebP.
+- **Remove hidden details**: strips location, device and tags before you share a file.
+- **Show file info**: codec, bitrate, streams and length, without converting.
+
+The Sony car presets do not take tweaks.
+
 ### Playlists
 
 Paste a playlist link on the **Playlist** tab and select **Load playlist**. Untick any videos you do not want, choose where the files go, then start the job. Videos are converted one after another, and any that fail (private or removed videos, for example) are listed and skipped.
@@ -204,6 +220,8 @@ Choose **Video**, then **Sony car MP4** (about 3.3 Mbps video and 192 kbps AAC a
 | POST | `/api/jobs/{id}/cancel` | Stops after the current video |
 | GET | `/api/jobs/{id}/zip` | Downloads the job's ZIP |
 | POST | `/api/jobs/{id}/open-folder` | Opens the job's folder in the file manager |
+| POST | `/api/jobs/upload` | Multipart form: `file`, `format`, optional `quality`, `mute`, `normalize`, `title`, `options` (JSON string: `video_codec`, `resize`, `volume`, `fade_in`, `fade_out`, `effect`, `target_mb`, `strip_metadata`, `subtitles`, `animated`, `animated_width`, `start`, `end`), `audio_file`, `subtitle_file` |
+| POST | `/api/probe` | Multipart form with `file`. Returns codec, bitrate, streams and length |
 | POST | `/api/convert-file` | Multipart form with `file`, `format`, optional `quality`. Returns the converted file |
 
 Interactive API docs are available at <http://localhost:8000/docs> while the server is running.
@@ -250,6 +268,7 @@ mediaforge/
 │   │   ├── main.py          # FastAPI app and endpoints
 │   │   ├── downloader.py    # yt-dlp download and conversion
 │   │   ├── transcoder.py    # FFmpeg conversion for uploaded files and the car presets
+│   │   ├── tweaks.py        # Validated file tweaks and the FFmpeg arguments they make
 │   │   ├── jobs.py          # background playlist jobs
 │   │   ├── cover.py         # square cover art for MP3 and M4A
 │   │   ├── ffmpeg_locator.py # finds FFmpeg even when the PATH is stale

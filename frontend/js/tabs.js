@@ -4,6 +4,7 @@ import { renderQualityOptions, renderSpec } from "./catalog.js";
 import { $, els } from "./dom.js";
 import { setStatus } from "./errors.js";
 import { updateExtras } from "./extras.js";
+import { updateTweaks } from "./tweaks.js";
 import { selectedEntries } from "./playlist.js";
 import { submitLabel } from "./progress.js";
 import { TABS, state } from "./state.js";
@@ -24,6 +25,7 @@ export function selectTab(mode) {
     renderSpec();
   }
   updateExtras();
+  updateTweaks();
   setStatus("");
 }
 

@@ -137,6 +137,8 @@
             <label for="file-title-input">New file name</label>
             <input id="file-title-input" type="text" maxlength="150" autocomplete="off" placeholder="Leave empty to keep the original name">
           </div>
+          <button type="button" id="tw-info-btn" class="btn btn-quiet info-btn" disabled>Show file info</button>
+          <div id="file-info" class="file-info" hidden></div>
         </section>
 
         <section id="panel-playlist" class="panel" role="tabpanel" aria-labelledby="tab-playlist" hidden>
@@ -196,6 +198,62 @@
         </dl>
         <p id="format-note" class="format-note" hidden></p>
 
+        <details id="tweaks" class="extras tweaks">
+          <summary>Tweaks <small>codec, size, sound, subtitles, GIF</small></summary>
+          <div class="extras-body">
+            <div class="mini-field" id="tw-codec-field"><label for="tw-codec">Video codec</label>
+              <select id="tw-codec"><option value="">Default for this format</option></select></div>
+            <div class="mini-field" id="tw-resize-field"><label for="tw-resize">Resize</label>
+              <select id="tw-resize"><option value="">Keep the original size</option></select></div>
+            <div class="mini-field" id="tw-target-field"><label for="tw-target">Make it smaller than (MB)</label>
+              <input id="tw-target" type="text" inputmode="decimal" placeholder="for example 25" maxlength="7" autocomplete="off"></div>
+
+            <fieldset class="group tw-group" id="tw-sound">
+              <legend class="field-label">Sound</legend>
+              <div class="trim-row">
+                <div class="mini-field"><label for="tw-volume">Volume (%)</label>
+                  <input id="tw-volume" type="text" inputmode="numeric" value="100" maxlength="3" autocomplete="off"></div>
+                <div class="mini-field"><label for="tw-fade-in">Fade in (seconds)</label>
+                  <input id="tw-fade-in" type="text" inputmode="decimal" placeholder="0" maxlength="4" autocomplete="off"></div>
+                <div class="mini-field"><label for="tw-fade-out">Fade out (seconds)</label>
+                  <input id="tw-fade-out" type="text" inputmode="decimal" placeholder="0" maxlength="4" autocomplete="off"></div>
+              </div>
+              <div class="mini-field"><label for="tw-effect">Sound effect</label>
+                <select id="tw-effect"><option value="">None</option></select></div>
+              <div class="mini-field" id="tw-audio-field"><label for="tw-audio-file">Replace the sound with</label>
+                <input id="tw-audio-file" type="file" accept="audio/*"></div>
+            </fieldset>
+
+            <fieldset class="group tw-group" id="tw-subs-group">
+              <legend class="field-label">Subtitles</legend>
+              <div class="mini-field"><label for="tw-subs-file">Subtitle file (.srt, .vtt, .ass)</label>
+                <input id="tw-subs-file" type="file" accept=".srt,.vtt,.ass,.ssa"></div>
+              <div class="segmented" id="tw-subs-mode" hidden>
+                <label class="segment"><input type="radio" name="tw-subs" value="soft" checked><span>Add as a track</span></label>
+                <label class="segment"><input type="radio" name="tw-subs" value="burn"><span>Burn into the picture</span></label>
+              </div>
+            </fieldset>
+
+            <div class="trim-row" id="tw-trim">
+              <div class="mini-field"><label for="tw-start">Start at</label><input id="tw-start" type="text" inputmode="numeric" placeholder="0:00" autocomplete="off" maxlength="9"></div>
+              <div class="mini-field"><label for="tw-end">Stop at</label><input id="tw-end" type="text" inputmode="numeric" placeholder="end of file" autocomplete="off" maxlength="9"></div>
+            </div>
+
+            <fieldset class="group tw-group" id="tw-animated-group">
+              <legend class="field-label">Make an animated picture</legend>
+              <div class="trim-row">
+                <div class="mini-field"><label for="tw-animated">Turn the clip into</label>
+                  <select id="tw-animated"><option value="">Nothing, keep the video</option><option value="gif">GIF</option><option value="webp">Animated WebP</option></select></div>
+                <div class="mini-field" id="tw-width-field" hidden><label for="tw-width">Width</label>
+                  <select id="tw-width"></select></div>
+              </div>
+              <p class="hint">For clips up to a minute. Use Start and Stop above to pick the part.</p>
+            </fieldset>
+
+            <label class="check" id="tw-meta-field"><input type="checkbox" id="tw-meta"><span>Remove hidden details <small>location, device and tags, before you share it</small></span></label>
+            <p id="tw-note" class="hint" hidden></p>
+          </div>
+        </details>
         <details id="extras" class="extras">
           <summary>More options</summary>
           <div class="extras-body">
