@@ -350,7 +350,7 @@ def test_unreadable_ffmpeg_lists_keep_choices_enabled(monkeypatch):
 def test_a_missing_filter_is_greyed_out(monkeypatch):
     monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
     monkeypatch.setattr(tweaks.ffmpeg_locator, "find_tool", lambda name: "ffmpeg")
-    filters = " T.. bass  A->A  Boost\n ... crossfeed  A->A  x\n"
+    filters = " T.. bass  A->A  Boost\n T. crossfeed  A->A  x\n"
     encoders = " V....D libx264  H.264\n"
     monkeypatch.setattr(
         tweaks, "_listing", lambda ffmpeg, flag: encoders if flag == "-encoders" else filters
@@ -358,4 +358,27 @@ def test_a_missing_filter_is_greyed_out(monkeypatch):
     caps = tweaks.capabilities()
     assert caps["effects"]["bass"] and not caps["effects"]["surround"]
     assert caps["video_codecs"]["h264"] and not caps["video_codecs"]["h265"]
+    monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
+
+
+def test_filter_lists_with_two_or_three_flag_characters_are_read(monkeypatch):
+    """FFmpeg 9 prints two flag characters per filter, older builds print three."""
+    monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
+    monkeypatch.setattr(tweaks.ffmpeg_locator, "find_tool", lambda name: "ffmpeg")
+    filters = (
+        "Filters:\n  T.. = Timeline support\n"
+        " T. crossfeed         A->A       Apply headphone crossfeed filter.\n"
+        " .. earwax            A->A       Widen the stereo image.\n"
+        " T.C subtitles        V->V       Render text subtitles.\n"
+        " ... palettegen       V->V       Find the optimal palette.\n"
+        " ... paletteuse       VV->V      Use a palette.\n"
+    )
+    encoders = " V....D libx264  H.264\n"
+    monkeypatch.setattr(
+        tweaks, "_listing", lambda ffmpeg, flag: encoders if flag == "-encoders" else filters
+    )
+    caps = tweaks.capabilities()
+    assert caps["effects"]["crossfeed"] and caps["effects"]["surround"]
+    assert not caps["effects"]["bass"]
+    assert caps["subtitles_burn"] and caps["animated"]["gif"]
     monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)

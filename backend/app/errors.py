@@ -245,10 +245,10 @@ CATALOG: dict[str, dict] = {
         "title": "Video is too long",
         "summary": "The video is longer than the limit MediaForge allows.",
         "what": "To protect your disk and time, MediaForge refuses very long videos.",
-        "why": ["The limit is one hour unless you raised it."],
+        "why": ["You set a length limit with MEDIAFORGE_MAX_DURATION."],
         "fix": [
             "Use Start and Stop under More options to download only part of it.",
-            "Or raise MEDIAFORGE_MAX_DURATION (in seconds) and restart.",
+            "Or raise MEDIAFORGE_MAX_DURATION (in seconds, 0 for no limit) and restart.",
         ],
     },
     "MF-LIM-03": {
@@ -256,7 +256,9 @@ CATALOG: dict[str, dict] = {
         "summary": "The uploaded file is bigger than the allowed size.",
         "what": "MediaForge refuses uploads above its size limit.",
         "why": ["The limit protects your disk and memory."],
-        "fix": ["Use a smaller file, or raise MEDIAFORGE_MAX_UPLOAD_MB and restart."],
+        "fix": [
+            "Use a smaller file, or raise MEDIAFORGE_MAX_UPLOAD_MB (0 for no limit) and restart."
+        ],
     },
     "MF-LIM-04": {
         "title": "Too many conversions waiting",

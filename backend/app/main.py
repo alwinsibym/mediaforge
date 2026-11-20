@@ -271,7 +271,7 @@ async def _save_upload(upload: UploadFile, destination: Path) -> None:
     with destination.open("wb") as out:
         while chunk := await upload.read(CHUNK_SIZE):
             written += len(chunk)
-            if written > limit:
+            if limit and written > limit:
                 raise ConversionError(f"File is larger than the {config.MAX_UPLOAD_MB} MB limit.")
             out.write(chunk)
     if written == 0:

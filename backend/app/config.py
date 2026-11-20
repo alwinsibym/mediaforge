@@ -3,11 +3,11 @@
 import os
 from pathlib import Path
 
-# Longest video (in seconds) that the URL converter will accept.
-MAX_DURATION_SECONDS = int(os.getenv("MEDIAFORGE_MAX_DURATION", "3600"))
+# Longest video (in seconds) that the URL converter will accept. 0 means no limit.
+MAX_DURATION_SECONDS = int(os.getenv("MEDIAFORGE_MAX_DURATION", "0"))
 
-# Largest file (in megabytes) accepted by the upload converter.
-MAX_UPLOAD_MB = int(os.getenv("MEDIAFORGE_MAX_UPLOAD_MB", "500"))
+# Largest file (in megabytes) accepted by the upload converter. 0 means no limit.
+MAX_UPLOAD_MB = int(os.getenv("MEDIAFORGE_MAX_UPLOAD_MB", "0"))
 
 # Where the static frontend lives (repo_root/frontend by default).
 FRONTEND_DIR = Path(

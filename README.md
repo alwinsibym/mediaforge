@@ -242,8 +242,8 @@ Set these environment variables before starting the server (or in `docker-compos
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `MEDIAFORGE_MAX_DURATION` | `3600` | Longest video accepted from a URL, in seconds |
-| `MEDIAFORGE_MAX_UPLOAD_MB` | `500` | Largest uploaded file, in megabytes |
+| `MEDIAFORGE_MAX_DURATION` | `0` | Longest video accepted from a URL, in seconds. `0` means no limit |
+| `MEDIAFORGE_MAX_UPLOAD_MB` | `0` | Largest uploaded file, in megabytes. `0` means no limit |
 | `MEDIAFORGE_DOWNLOAD_DIR` | `../downloads` | Where playlist folders are saved |
 | `MEDIAFORGE_MAX_PLAYLIST_ITEMS` | `200` | Most videos accepted from one playlist |
 | `MEDIAFORGE_DATA_DIR` | `../data` | Where settings and history are kept |

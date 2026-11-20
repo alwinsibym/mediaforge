@@ -278,7 +278,7 @@ def capabilities() -> dict:
     encoders_text = _listing(ffmpeg, "-encoders")
     filters_text = _listing(ffmpeg, "-filters")
     encoders = set(re.findall(r"^\s*[VAS][\w.]{5}\s+(\S+)", encoders_text, re.M))
-    filters = set(re.findall(r"^\s*[\w.]{3}\s+(\S+)\s", filters_text, re.M))
+    filters = set(re.findall(r"^\s*[\w.]{2,3}\s+(\S+)\s+[AVN|]+->[AVN|]+", filters_text, re.M))
     unknown_encoders = not encoders
     unknown_filters = not filters
     caps = {
