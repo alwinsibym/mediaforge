@@ -37,3 +37,5 @@ cookies*.txt
 sites.txt
 site-report.md
 node_modules/
+
+!docs/demo.mp4
