@@ -22,6 +22,9 @@ const t = {
   effect: $("tw-effect"),
   audioField: $("tw-audio-field"),
   audioFile: $("tw-audio-file"),
+  coverField: $("tw-cover-field"),
+  coverFile: $("tw-cover-file"),
+  coverPreview: $("tw-cover-preview"),
   subsGroup: $("tw-subs-group"),
   subsFile: $("tw-subs-file"),
   subsMode: $("tw-subs-mode"),
@@ -78,6 +81,8 @@ export function updateTweaks() {
   t.targetField.hidden = audio && ["wav", "flac"].includes(state.format) ? true : animated;
   t.audioField.hidden = !video || animated;
   t.subsGroup.hidden = !video || animated;
+  const coverFormats = state.catalogue?.tweaks?.cover_formats || [];
+  t.coverField.hidden = animated || !coverFormats.includes(state.format);
   t.animatedGroup.hidden = !video;
   t.widthField.hidden = !animated;
   t.sound.hidden = animated;
@@ -96,7 +101,7 @@ function numberOrEmpty(input) {
 
 /* What the person chose, as the server expects it: a JSON string and two optional files. */
 export function collectTweaks() {
-  if (state.format.startsWith("sony_")) return { options: "", audio: null, subtitles: null };
+  if (state.format.startsWith("sony_")) return { options: "", audio: null, subtitles: null, cover: null };
   const o = {};
   const add = (key, value) => { if (value !== "" && value != null) o[key] = value; };
   const video = state.kind === "video";
@@ -121,7 +126,8 @@ export function collectTweaks() {
   if (subs) o.subtitles = document.querySelector('input[name="tw-subs"]:checked').value;
   const audio = !t.audioField.hidden && !t.audioFile.disabled && t.audioFile.files[0] ? t.audioFile.files[0] : null;
   if (audio) o.replace_audio = true;
-  return { options: Object.keys(o).length ? JSON.stringify(o) : "", audio, subtitles: subs };
+  const cover = !t.coverField.hidden && t.coverFile.files[0] ? t.coverFile.files[0] : null;
+  return { options: Object.keys(o).length ? JSON.stringify(o) : "", audio, subtitles: subs, cover };
 }
 
 function row(label, value) {
@@ -187,4 +193,10 @@ export function resetFileInfo() {
 export function wireTweaks() {
   t.infoBtn.addEventListener("click", showFileInfo);
   for (const el of [t.animated, t.subsFile, els.optMute]) el.addEventListener("change", updateTweaks);
+  t.coverFile.addEventListener("change", () => {
+    const file = t.coverFile.files[0];
+    if (t.coverPreview.src) URL.revokeObjectURL(t.coverPreview.src);
+    t.coverPreview.hidden = !file;
+    if (file) t.coverPreview.src = URL.createObjectURL(file);
+  });
 }

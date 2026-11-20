@@ -341,6 +341,15 @@ def create_job(body: JobRequest) -> dict:
     return jobs.snapshot(job)
 
 
+class _Frontend(StaticFiles):
+    """Serve the page, but make the browser re-check it, so an update is never hidden by a cache."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 SUBTITLE_LIMIT = 5 * 1024 * 1024
 
 
@@ -353,6 +362,8 @@ async def _save_extra(upload: UploadFile | None, folder: Path, stem: str, allowe
         raise ConversionError(
             "Subtitles must be a .srt, .vtt, .ass or .ssa file."
             if allowed is tweaks.SUBTITLE_EXTENSIONS
+            else "The cover picture must be a JPG, PNG or WebP image."
+            if allowed is tweaks.COVER_EXTENSIONS
             else tweaks.AUDIO_FILE_LIMIT_NOTE
         )
     if allowed is None and not re.fullmatch(r"\.[a-z0-9]{1,5}", suffix):
@@ -360,8 +371,10 @@ async def _save_extra(upload: UploadFile | None, folder: Path, stem: str, allowe
     folder.mkdir(exist_ok=True)
     destination = folder / f"{stem}{suffix}"
     await _save_upload(upload, destination)
-    if allowed is tweaks.SUBTITLE_EXTENSIONS and destination.stat().st_size > SUBTITLE_LIMIT:
-        raise ConversionError("That subtitle file is too large.")
+    if allowed in (tweaks.SUBTITLE_EXTENSIONS, tweaks.COVER_EXTENSIONS) and (
+        destination.stat().st_size > SUBTITLE_LIMIT * 2
+    ):
+        raise ConversionError("That file is too large to use here.")
     return destination
 
 
@@ -376,6 +389,7 @@ async def create_upload_job(
     options: str = Form(""),
     audio_file: UploadFile | None = File(None),
     subtitle_file: UploadFile | None = File(None),
+    cover_file: UploadFile | None = File(None),
 ) -> dict:
     """Upload a file and convert it in the background, with live progress."""
     try:
@@ -393,6 +407,7 @@ async def create_upload_job(
             fmt,
             audio_file=bool(audio_file and audio_file.filename),
             subtitle_file=bool(subtitle_file and subtitle_file.filename),
+            cover_file=bool(cover_file and cover_file.filename),
         )
     except json.JSONDecodeError:
         raise _bad_request("The tweaks were not understood.") from None
@@ -412,6 +427,7 @@ async def create_upload_job(
         job.subtitle_file = await _save_extra(
             subtitle_file, extra, "subtitles", tweaks.SUBTITLE_EXTENSIONS
         )
+        job.cover_file = await _save_extra(cover_file, extra, "cover", tweaks.COVER_EXTENSIONS)
     except ConversionError as exc:
         jobs.discard(job)
         raise _bad_request(exc) from exc
@@ -659,4 +675,4 @@ async def update_ytdlp(request: Request) -> dict:
 
 # Serve the frontend last so /api/* routes take priority.
 if config.FRONTEND_DIR.is_dir():
-    app.mount("/", StaticFiles(directory=config.FRONTEND_DIR, html=True), name="frontend")
+    app.mount("/", _Frontend(directory=config.FRONTEND_DIR, html=True), name="frontend")

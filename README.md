@@ -155,6 +155,7 @@ On the **File** tab, open **Tweaks** to change a file while converting it. Nothi
 - **Resize**: 360p up to 4K, up or down.
 - **Make it smaller than**: give a size in MB. MediaForge plans the bitrate for the clip length and retries if the first try was too big.
 - **Sound**: volume, fade in, fade out, and a sound effect (bass boost, treble boost, clearer voice, wider stereo, headphone crossfeed, virtual surround). "Even out the volume" is under More options. You can also replace the sound with another audio file, or tick "Remove the sound" for a silent video. Audio-only extraction is the Audio type.
+- **Cover picture**: replace the thumbnail shown in players and file managers (MP3, M4A, FLAC, MP4, MKV). JPG, PNG or WebP.
 - **Subtitles**: add an .srt, .vtt or .ass file as a selectable track, or burn it into the picture.
 - **Start and stop**: keep only part of the file.
 - **Animated picture**: turn a clip of up to a minute into a GIF or an animated WebP.

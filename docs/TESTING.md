@@ -188,4 +188,5 @@ Use a short clip of your own, 20 to 60 seconds, with sound.
 - [ ] Replace the sound with another audio file; the video plays the new sound
 - [ ] A .srt file added as a track can be switched on in VLC; burned in is always visible
 - [ ] GIF and animated WebP of a 5 second clip play in the browser
+- [ ] Cover picture: pick a JPG, convert to MP3 and MP4; the picture shows in Windows Explorer or VLC
 - [ ] Remove hidden details: the file's Properties no longer show the camera, GPS or title

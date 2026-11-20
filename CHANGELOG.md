@@ -6,6 +6,12 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- A cover picture (thumbnail) can be added to uploaded files: MP3, M4A, FLAC, MP4 and MKV.
+
+### Fixed
+- The page is re-checked by the browser on every visit (`Cache-Control: no-cache`), so an update is never hidden by a stale cache. This fixed "larger than the 0 MB limit" after the limits were removed.
+
 ## [0.4.0]
 
 ### Added

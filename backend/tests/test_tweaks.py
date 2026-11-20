@@ -382,3 +382,84 @@ def test_filter_lists_with_two_or_three_flag_characters_are_read(monkeypatch):
     assert not caps["effects"]["bass"]
     assert caps["subtitles_burn"] and caps["animated"]["gif"]
     monkeypatch.setattr(tweaks, "_CAPS_CACHE", None)
+
+
+def test_cover_picture_rules():
+    assert tweaks.parse({}, "mp3", cover_file=True).cover
+    assert tweaks.parse({}, "mp4", cover_file=True).cover
+    with pytest.raises(ValueError, match="cover picture"):
+        tweaks.parse({}, "wav", cover_file=True)
+    with pytest.raises(ValueError, match="cover picture"):
+        tweaks.parse({"animated": "gif"}, "mp4", cover_file=True)
+    with pytest.raises(ValueError, match="Sony presets"):
+        tweaks.parse({}, "sony_avi", cover_file=True)
+
+
+def _cover(tmp_path):
+    cover = tmp_path / "cover.png"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=red:s=600x400",
+            "-frames:v",
+            "1",
+            str(cover),
+        ],
+        check=True,
+    )
+    return cover
+
+
+@requires_ffmpeg
+@pytest.mark.parametrize("fmt", ["mp3", "m4a", "flac", "mp4", "mkv"])
+def test_cover_picture_is_embedded(tmp_path, sample_video, fmt):
+    cover = _cover(tmp_path)
+    out_dir = tmp_path / "out"
+    out_dir.mkdir()
+    out = transcoder.convert_file(
+        sample_video,
+        fmt,
+        "192" if fmt in ("mp3", "m4a") else "720",
+        out_dir,
+        tweaks=tweaks.parse({}, fmt, cover_file=True),
+        cover_file=cover,
+    )
+    text = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-i", str(out)], capture_output=True, text=True
+    ).stderr
+    assert "attached pic" in text
+    if fmt == "mp4":
+        assert text.count("Video:") == 2  # the film and the cover
+
+
+def test_api_rejects_a_wrong_cover_type(client):
+    response = client.post(
+        "/api/jobs/upload",
+        files={"file": ("a.mp3", b"x"), "cover_file": ("c.exe", b"x")},
+        data={"format": "mp3"},
+    )
+    assert response.status_code == 400
+
+
+def test_page_is_not_cached_blindly(client):
+    assert client.get("/").headers["cache-control"] == "no-cache"
+
+
+@requires_ffmpeg
+def test_api_upload_with_a_cover_picture(client, sample_video, tmp_path):
+    cover = _cover(tmp_path)
+    with sample_video.open("rb") as video, cover.open("rb") as picture:
+        created = client.post(
+            "/api/jobs/upload",
+            files={"file": ("clip.mp4", video), "cover_file": ("cover.png", picture)},
+            data={"format": "mp3", "quality": "192"},
+        )
+    assert created.status_code == 200
+    job = _wait(created.json()["id"])
+    assert jobs.snapshot(job)["items"][0]["status"] == "done"
