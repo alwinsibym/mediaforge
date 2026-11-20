@@ -20,6 +20,15 @@ MIN_VOLUME, MAX_VOLUME = 10, 400  # percent
 MIN_TARGET_MB, MAX_TARGET_MB = 0.5, 20000.0
 MIN_VIDEO_KBPS = 100
 SUBTITLE_EXTENSIONS = {".srt", ".vtt", ".ass", ".ssa"}
+COVER_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+COVER_FORMATS = {"mp3", "m4a", "flac", "mp4", "mkv"}
+COVER_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+COVER_FILTER = "scale='min(1000,iw)':-2,format=yuvj420p"
 AUDIO_FILE_LIMIT_NOTE = "Pick an audio file (MP3, M4A, WAV, FLAC, OGG, Opus and similar)."
 
 # Container choices per video codec, and the FFmpeg encoders that make them.
@@ -88,6 +97,7 @@ class Tweaks:
     start: float | None = None  # seconds
     end: float | None = None
     title: str | None = None
+    cover: bool = False  # a new cover picture (thumbnail) is supplied
 
     @property
     def trimmed(self) -> bool:
@@ -128,7 +138,12 @@ def _number(data: dict, key: str, low: float, high: float, label: str) -> float 
 
 
 def parse(
-    data: dict | None, fmt: str, *, audio_file: bool = False, subtitle_file: bool = False
+    data: dict | None,
+    fmt: str,
+    *,
+    audio_file: bool = False,
+    subtitle_file: bool = False,
+    cover_file: bool = False,
 ) -> Tweaks:
     """Check the person's choices against the output format and build a Tweaks.
 
@@ -136,7 +151,7 @@ def parse(
     """
     data = data or {}
     if formats.is_preset(fmt) and (
-        audio_file or subtitle_file or any(data.get(k) for k in _TWEAK_KEYS)
+        audio_file or subtitle_file or cover_file or any(data.get(k) for k in _TWEAK_KEYS)
     ):
         raise ValueError("The Sony presets cannot be combined with tweaks. Choose MP4 instead.")
     is_video = formats.is_video(fmt) and not formats.is_preset(fmt)
@@ -203,6 +218,9 @@ def parse(
     if strip and title:
         raise ValueError("Removing metadata and setting a new title cannot be combined.")
 
+    if cover_file and (fmt not in COVER_FORMATS or animated):
+        raise ValueError("A cover picture can be added to MP3, M4A, FLAC, MP4 and MKV files.")
+
     start = parse_timestamp(data.get("start"))
     end = parse_timestamp(data.get("end"))
     if start is not None and end is not None and end <= start:
@@ -228,6 +246,7 @@ def parse(
         start=start,
         end=end,
         title=title,
+        cover=cover_file,
     )
     if formats.is_preset(fmt) and (
         result.changes_picture or result.changes_sound or result.trimmed
@@ -306,6 +325,8 @@ def describe() -> dict:
     """Choices and what this computer can do, for the page."""
     return {
         "resize_heights": list(RESIZE_HEIGHTS),
+        "cover_formats": sorted(COVER_FORMATS),
+        "cover_extensions": sorted(COVER_EXTENSIONS),
         "video_codecs": [
             {"id": k, "label": v["label"], "containers": sorted(v["containers"])}
             for k, v in VIDEO_CODECS.items()
@@ -462,6 +483,7 @@ def build_command(
     audio_file: Path | None = None,
     subtitle_name: str | None = None,
     subtitle_file: Path | None = None,
+    cover_file: Path | None = None,
     bitrate_kbps: int | None = None,
     audio_kbps: int | None = None,
     has_audio: bool = True,
@@ -482,6 +504,11 @@ def build_command(
     if subtitle_file is not None and tweaks.subtitles == "soft":
         command += ["-i", str(subtitle_file)]
         sub_input = next_input
+        next_input += 1
+    cover_input = None
+    if cover_file is not None and tweaks.cover:
+        command += ["-i", str(cover_file)]
+        cover_input = next_input
         next_input += 1
 
     out_len = effective_duration(duration, tweaks)
@@ -516,7 +543,12 @@ def build_command(
     is_audio_out = formats.is_audio(fmt)
 
     if is_audio_out:
-        command += ["-map", "0:a:0", "-vn"]
+        command += ["-map", "0:a:0"]
+        if cover_input is not None:
+            command += ["-map", f"{cover_input}:v:0", "-c:v", "mjpeg", "-vf", COVER_FILTER]
+            command += ["-disposition:v", "attached_pic"]
+        else:
+            command += ["-vn"]
         command += ["-c:a", formats.AUDIO_FORMATS[fmt]["ffmpeg_codec"]]
         if fmt not in formats.LOSSLESS_AUDIO:
             kbps = audio_kbps or int(quality)
@@ -536,7 +568,7 @@ def build_command(
         if tweaks.subtitles == "burn" and subtitle_name:
             vfilters.append(f"subtitles={subtitle_name}")
         if vfilters:
-            command += ["-vf", ",".join(vfilters)]
+            command += ["-filter:v:0", ",".join(vfilters)]
         command += video_args(fmt, tweaks, quality, bitrate_kbps)
         # sound
         if mute:
@@ -550,6 +582,15 @@ def build_command(
                 command += ["-af", ",".join(chain)]
             if audio_input is not None:
                 command += ["-shortest"]
+        # a new cover picture
+        if cover_input is not None and fmt == "mp4":
+            command += ["-map", f"{cover_input}:v:0", "-c:v:1", "mjpeg"]
+            command += ["-filter:v:1", COVER_FILTER, "-pix_fmt:v:1", "yuvj420p"]
+            command += ["-disposition:v:1", "attached_pic"]
+        elif cover_input is not None:
+            mime = COVER_MIME.get(Path(cover_file).suffix.lower(), "image/jpeg")
+            command += ["-attach", str(cover_file), "-metadata:s:t", f"mimetype={mime}"]
+            command += ["-metadata:s:t", "filename=cover" + Path(cover_file).suffix.lower()]
         # soft subtitles
         if sub_input is not None:
             codec = {"mp4": "mov_text", "webm": "webvtt"}.get(fmt, "srt")

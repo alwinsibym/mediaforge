@@ -51,6 +51,7 @@ function startFileJob() {
   if (tweaks.options) data.append("options", tweaks.options);
   if (tweaks.audio) data.append("audio_file", tweaks.audio);
   if (tweaks.subtitles) data.append("subtitle_file", tweaks.subtitles);
+  if (tweaks.cover) data.append("cover_file", tweaks.cover);
 
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();

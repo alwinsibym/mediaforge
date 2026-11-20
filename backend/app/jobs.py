@@ -97,6 +97,7 @@ class Job:
     tweaks: tweaks_mod.Tweaks = field(default_factory=tweaks_mod.Tweaks)
     audio_file: Path | None = None
     subtitle_file: Path | None = None
+    cover_file: Path | None = None
     parallel: int = 1  # items worked on at the same time
     blocked: bool = False  # the job stopped early because the site kept refusing or was unreachable
     blocked_reason: str = ""  # "sign-in" or "network"
@@ -415,6 +416,7 @@ def _produce(job: Job, item: Item, workdir: Path, report, notes: list[str]) -> P
             tweaks=job.tweaks,
             audio_file=job.audio_file,
             subtitle_file=job.subtitle_file,
+            cover_file=job.cover_file,
         )
     return downloader.download_and_convert(
         item.url,

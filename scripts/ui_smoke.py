@@ -98,6 +98,7 @@ def _fake_convert(
     tweaks=None,
     audio_file=None,
     subtitle_file=None,
+    cover_file=None,
 ):
     SEEN_TWEAKS.append((fmt, tweaks, subtitle_file is not None))
     out = Path(workdir) / f"{Path(source).stem}.mp3"
@@ -323,6 +324,7 @@ def run(playwright, base: str, show: bool) -> None:
     srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
     page.set_input_files("#tw-subs-file", str(srt))
     check("subtitle mode appears once a file is chosen", page.is_visible("#tw-subs-mode"))
+    check("cover picture field shows for MP4", page.is_visible("#tw-cover-field"))
     SEEN_TWEAKS.clear()
     page.click("#submit-btn")
     for _ in range(100):

@@ -174,6 +174,7 @@ def convert_file(
     tweaks: "tw.Tweaks | None" = None,
     audio_file: Path | None = None,
     subtitle_file: Path | None = None,
+    cover_file: Path | None = None,
 ) -> Path:
     """Convert `source` and return the path of the converted file.
 
@@ -195,6 +196,7 @@ def convert_file(
             tweaks,
             audio_file,
             subtitle_file,
+            cover_file,
         )
 
     ext = formats.extension(fmt)
@@ -251,7 +253,17 @@ def _run(command: list[str], duration: float | None, progress, cwd: Path) -> tup
 
 
 def _convert_with_tweaks(
-    source, fmt, quality, workdir, mute, progress, normalize, tweaks, audio_file, subtitle_file
+    source,
+    fmt,
+    quality,
+    workdir,
+    mute,
+    progress,
+    normalize,
+    tweaks,
+    audio_file,
+    subtitle_file,
+    cover_file=None,
 ) -> Path:
     ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
     ext = (
@@ -302,6 +314,7 @@ def _convert_with_tweaks(
                 audio_file=audio_file,
                 subtitle_name=sub_name,
                 subtitle_file=sub_path,
+                cover_file=cover_file,
                 bitrate_kbps=bitrate,
                 audio_kbps=audio_kbps,
                 has_audio=has_audio,

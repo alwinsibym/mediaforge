@@ -853,3 +853,4 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .info-row dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
 @media (max-width: 480px) { .info-row { grid-template-columns: 1fr; gap: 0; } }
 .info-btn { margin-top: 10px; }
+.cover-preview { display: block; width: 96px; height: 96px; margin-top: 8px; object-fit: cover; border: 1px solid var(--line); border-radius: 8px; }
