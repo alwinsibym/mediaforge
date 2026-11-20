@@ -52,6 +52,7 @@ export const els = {
   pendingList: $("pending-list"),
   historyBtn: $("history-btn"),
   settingsBtn: $("settings-btn"),
+  quitBtn: $("quit-btn"),
   settingsDialog: $("settings-dialog"),
   settingsForm: $("settings-form"),
   setBrowser: $("set-browser"),

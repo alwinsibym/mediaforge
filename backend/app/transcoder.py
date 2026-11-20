@@ -1,12 +1,14 @@
 """Convert local audio/video files with FFmpeg."""
 
 import re
+import shutil
 import subprocess
 import tempfile
 import time
 from pathlib import Path
 
 from . import ffmpeg_locator, formats
+from . import tweaks as tw
 from .downloader import FFMPEG_HELP, ConversionError
 
 FFMPEG_TIMEOUT_SECONDS = 1800
@@ -120,13 +122,16 @@ def media_duration(path: Path) -> float | None:
     return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
-def _run_with_progress(command: list[str], duration: float | None, report) -> tuple[int, str]:
+def _run_with_progress(
+    command: list[str], duration: float | None, report, cwd: Path | None = None
+) -> tuple[int, str]:
     """Run FFmpeg and report how far along it is. Returns (exit code, error text)."""
     command = [command[0], "-progress", "pipe:1", "-nostats", *command[1:]]
     started = time.monotonic()
     with tempfile.TemporaryFile("w+") as errors:
         process = subprocess.Popen(  # noqa: S603
             command,
+            cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=errors,
             text=True,
@@ -166,6 +171,9 @@ def convert_file(
     mute: bool = False,
     progress=None,
     normalize: bool = False,
+    tweaks: "tw.Tweaks | None" = None,
+    audio_file: Path | None = None,
+    subtitle_file: Path | None = None,
 ) -> Path:
     """Convert `source` and return the path of the converted file.
 
@@ -174,6 +182,20 @@ def convert_file(
     """
     if not ffmpeg_available():
         raise ConversionError(FFMPEG_HELP)
+
+    if tweaks is not None and not tweaks.is_default:
+        return _convert_with_tweaks(
+            source,
+            fmt,
+            quality,
+            workdir,
+            mute,
+            progress,
+            normalize,
+            tweaks,
+            audio_file,
+            subtitle_file,
+        )
 
     ext = formats.extension(fmt)
     target = workdir / f"{source.stem}.{ext}"
@@ -204,6 +226,200 @@ def convert_file(
         raise ConversionError(f"FFmpeg could not convert this file: {reason[:200]}")
 
     return target
+
+
+def _has_audio(path: Path) -> bool:
+    return bool(probe(path).get("audio"))
+
+
+def _run(command: list[str], duration: float | None, progress, cwd: Path) -> tuple[int, str]:
+    if progress is not None:
+        return _run_with_progress(command, duration, progress, cwd=cwd)
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=FFMPEG_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ConversionError("The conversion took too long and was stopped.") from exc
+    return result.returncode, result.stderr or ""
+
+
+def _convert_with_tweaks(
+    source, fmt, quality, workdir, mute, progress, normalize, tweaks, audio_file, subtitle_file
+) -> Path:
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
+    ext = (
+        "gif"
+        if tweaks.animated == "gif"
+        else "webp"
+        if tweaks.animated == "webp"
+        else formats.extension(fmt)
+    )
+    target = workdir / f"{source.stem}.{ext}"
+    if target == source:
+        target = workdir / f"{source.stem}-converted.{ext}"
+
+    duration = media_duration(source)
+    out_len = tw.effective_duration(duration, tweaks)
+    if tweaks.animated:
+        if out_len is None or out_len > tw.ANIMATED_MAX_SECONDS:
+            raise ConversionError(
+                f"GIF and WebP are for short clips. Trim to {tw.ANIMATED_MAX_SECONDS} seconds "
+                "or less."
+            )
+
+    # Subtitle files are copied to a name MediaForge chose, so the filter never sees user text.
+    sub_name = None
+    sub_path = None
+    if subtitle_file is not None and tweaks.subtitles:
+        suffix = subtitle_file.suffix.lower()
+        sub_name = f"subtitles{suffix}"
+        sub_path = workdir / sub_name
+        shutil.copyfile(subtitle_file, sub_path)
+
+    has_audio = _has_audio(source)
+    if not has_audio and not mute and tweaks.changes_sound and not tweaks.replace_audio:
+        raise ConversionError("This file has no sound, so the sound tweaks cannot be applied.")
+
+    def run(bitrate=None, audio_kbps=None):
+        try:
+            command = tw.build_command(
+                source,
+                target,
+                fmt,
+                quality,
+                tweaks,
+                ffmpeg=ffmpeg,
+                duration=duration,
+                mute=mute,
+                normalize=normalize,
+                audio_file=audio_file,
+                subtitle_name=sub_name,
+                subtitle_file=sub_path,
+                bitrate_kbps=bitrate,
+                audio_kbps=audio_kbps,
+                has_audio=has_audio,
+            )
+        except ValueError as exc:
+            raise ConversionError(str(exc)) from exc
+        if progress is not None:
+            progress({"phase": "converting", "percent": 0})
+        code, error_text = _run(command, out_len, progress, workdir)
+        if code != 0 or not target.exists():
+            detail = error_text.strip().splitlines()
+            reason = detail[-1] if detail else "unknown error"
+            raise ConversionError(f"FFmpeg could not convert this file: {reason[:200]}")
+
+    limit = int(tweaks.target_mb * 1024 * 1024) if tweaks.target_mb else None
+    if limit is None:
+        run()
+        return target
+    if out_len is None or out_len <= 0:
+        raise ConversionError(
+            "The length of this file could not be read, so a size target cannot be set."
+        )
+    shrink = 1.0
+    for _attempt in range(3):
+        try:
+            if formats.is_audio(fmt):
+                run(audio_kbps=tw.audio_bitrate_for_size(tweaks.target_mb, out_len, shrink))
+            else:
+                video_kbps, audio_kbps = tw.plan_bitrates(
+                    tweaks.target_mb, out_len, has_audio and not mute, shrink
+                )
+                run(bitrate=video_kbps, audio_kbps=audio_kbps or None)
+        except ValueError as exc:
+            raise ConversionError(str(exc)) from exc
+        size = target.stat().st_size
+        if size <= limit:
+            return target
+        shrink *= max(0.5, limit / size * 0.92)
+    raise ConversionError(
+        f"Could not get this under {tweaks.target_mb:g} MB without ruining it. "
+        "Try a larger size or a shorter clip."
+    )
+
+
+def probe(path: Path) -> dict:
+    """Plain facts about a media file, read from FFmpeg's report (no ffprobe needed)."""
+    ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
+    try:
+        text = (
+            subprocess.run(
+                [ffmpeg, "-hide_banner", "-i", str(path)],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=60,
+            ).stderr
+            or ""
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"video": [], "audio": [], "subtitles": []}
+    info = {
+        "duration": None,
+        "bitrate_kbps": None,
+        "video": [],
+        "audio": [],
+        "subtitles": [],
+        "metadata": False,
+    }
+    m = _DURATION_RE.search(text)
+    if m:
+        h, mi, se = m.groups()
+        info["duration"] = int(h) * 3600 + int(mi) * 60 + float(se)
+    b = re.search(r"bitrate:\s*(\d+)\s*kb/s", text)
+    if b:
+        info["bitrate_kbps"] = int(b.group(1))
+    for line in text.splitlines():
+        s = re.match(
+            r"\s*Stream #\d+:\d+(?:\[[^\]]*\])?(?:\((\w+)\))?: (Video|Audio|Subtitle): (.*)", line
+        )
+        if not s:
+            continue
+        lang, kind, rest = s.groups()
+        codec = rest.split(",")[0].split(" ")[0].strip()
+        entry = {"codec": codec}
+        if lang and lang != "und":
+            entry["language"] = lang
+        kb = re.search(r"(\d+)\s*kb/s", rest)
+        if kb:
+            entry["bitrate_kbps"] = int(kb.group(1))
+        if kind == "Video":
+            size = re.search(r"(\d{2,5})x(\d{2,5})", rest)
+            if size:
+                entry["width"], entry["height"] = int(size.group(1)), int(size.group(2))
+            fps = re.search(r"([\d.]+)\s*fps", rest)
+            if fps:
+                entry["fps"] = float(fps.group(1))
+            if "attached pic" in rest:
+                continue
+            info["video"].append(entry)
+        elif kind == "Audio":
+            hz = re.search(r"(\d+)\s*Hz", rest)
+            if hz:
+                entry["sample_rate"] = int(hz.group(1))
+            for name in ("mono", "stereo", "5.1", "7.1"):
+                if f", {name}" in rest:
+                    entry["channels"] = name
+            info["audio"].append(entry)
+        else:
+            info["subtitles"].append(entry)
+    info["metadata"] = bool(
+        re.search(
+            r"^\s{2,4}(location|com\.apple|make|model|creation_time|artist|title|comment|encoder)\b",
+            text,
+            re.M | re.I,
+        )
+    )
+    return info
 
 
 def strip_audio(path: Path) -> None:

@@ -2,6 +2,8 @@
 
 import hmac
 import importlib.metadata
+import json
+import re
 import shutil
 import subprocess
 import sys
@@ -27,8 +29,10 @@ from . import (
     history,
     jobs,
     pending,
+    runtime,
     settings,
     transcoder,
+    tweaks,
     validators,
 )
 from .downloader import ConversionError
@@ -162,6 +166,16 @@ def _file_response(path: Path, workdir: str) -> FileResponse:
     )
 
 
+@app.post("/api/quit")
+def quit_app(request: Request) -> dict:
+    """Stop MediaForge. Only the computer running it may do this."""
+    _local_only(request)
+    if runtime.SERVER is None:
+        raise HTTPException(status_code=409, detail="MediaForge was not started with run.py.")
+    runtime.SERVER.should_exit = True
+    return {"ok": True}
+
+
 @app.get("/api/health")
 def health(request: Request) -> dict:
     return {
@@ -174,6 +188,7 @@ def health(request: Request) -> dict:
         "aria2c": downloader.aria2c_available(),
         "auth_required": bool(config.ACCESS_TOKEN),
         "authorised": _authorised(request),
+        "can_quit": runtime.SERVER is not None and _is_local(request),
     }
 
 
@@ -187,6 +202,7 @@ def list_formats() -> dict:
             "max_playlist_items": config.MAX_PLAYLIST_ITEMS,
         },
         "download_dir": str(config.DOWNLOAD_DIR),
+        "tweaks": tweaks.describe(),
     }
 
 
@@ -325,6 +341,30 @@ def create_job(body: JobRequest) -> dict:
     return jobs.snapshot(job)
 
 
+SUBTITLE_LIMIT = 5 * 1024 * 1024
+
+
+async def _save_extra(upload: UploadFile | None, folder: Path, stem: str, allowed: set[str] | None):
+    """Save an optional extra file (subtitles or replacement audio) and return its path."""
+    if upload is None or not upload.filename:
+        return None
+    suffix = Path(upload.filename).suffix.lower()
+    if allowed is not None and suffix not in allowed:
+        raise ConversionError(
+            "Subtitles must be a .srt, .vtt, .ass or .ssa file."
+            if allowed is tweaks.SUBTITLE_EXTENSIONS
+            else tweaks.AUDIO_FILE_LIMIT_NOTE
+        )
+    if allowed is None and not re.fullmatch(r"\.[a-z0-9]{1,5}", suffix):
+        suffix = ".audio"
+    folder.mkdir(exist_ok=True)
+    destination = folder / f"{stem}{suffix}"
+    await _save_upload(upload, destination)
+    if allowed is tweaks.SUBTITLE_EXTENSIONS and destination.stat().st_size > SUBTITLE_LIMIT:
+        raise ConversionError("That subtitle file is too large.")
+    return destination
+
+
 @app.post("/api/jobs/upload")
 async def create_upload_job(
     file: UploadFile = File(...),
@@ -333,6 +373,9 @@ async def create_upload_job(
     mute: bool = Form(False),
     normalize: bool = Form(False),
     title: str = Form(""),
+    options: str = Form(""),
+    audio_file: UploadFile | None = File(None),
+    subtitle_file: UploadFile | None = File(None),
 ) -> dict:
     """Upload a file and convert it in the background, with live progress."""
     try:
@@ -342,17 +385,33 @@ async def create_upload_job(
     original = file.filename or "upload"
     try:
         wanted = features.parse({"title": title}, fmt, single=True).title
+        raw = json.loads(options) if options.strip() else {}
+        if not isinstance(raw, dict):
+            raise ValueError("The tweaks were not understood.")
+        chosen = tweaks.parse(
+            {**raw, "mute": mute},
+            fmt,
+            audio_file=bool(audio_file and audio_file.filename),
+            subtitle_file=bool(subtitle_file and subtitle_file.filename),
+        )
+    except json.JSONDecodeError:
+        raise _bad_request("The tweaks were not understood.") from None
     except ValueError as exc:
         raise _bad_request(exc) from exc
     name = f"{wanted}{Path(original).suffix}" if wanted else original
     try:
         job, destination = jobs.prepare_upload_job(
-            name, fmt, quality, mute, features.Features(normalize=normalize)
+            name, fmt, quality, mute, features.Features(normalize=normalize), chosen
         )
     except ConversionError as exc:
         raise _bad_request(exc) from exc
     try:
         await _save_upload(file, destination)
+        extra = job.staging / "extra"
+        job.audio_file = await _save_extra(audio_file, extra, "audio", None)
+        job.subtitle_file = await _save_extra(
+            subtitle_file, extra, "subtitles", tweaks.SUBTITLE_EXTENSIONS
+        )
     except ConversionError as exc:
         jobs.discard(job)
         raise _bad_request(exc) from exc
@@ -361,6 +420,23 @@ async def create_upload_job(
         raise HTTPException(status_code=500, detail="Unexpected server error.") from None
     jobs.submit_upload(job)
     return jobs.snapshot(job)
+
+
+@app.post("/api/probe")
+async def probe_file(file: UploadFile = File(...)) -> dict:
+    """Read the codec, bitrate, streams and length of a file, without converting it."""
+    workdir = Path(tempfile.mkdtemp(prefix="mediaforge-probe-"))
+    try:
+        destination = workdir / validators.safe_filename(file.filename, default="upload")
+        await _save_upload(file, destination)
+        info = await run_in_threadpool(transcoder.probe, destination)
+        info["size_bytes"] = destination.stat().st_size
+        info["name"] = destination.name
+        return info
+    except ConversionError as exc:
+        raise _bad_request(exc) from exc
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 def _find_job(job_id: str) -> jobs.Job:

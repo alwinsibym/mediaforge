@@ -4,6 +4,7 @@ import { ensureLoggedIn } from "./auth.js";
 import { loadFormats, renderQualityOptions, renderSpec, selectKind } from "./catalog.js";
 import { els } from "./dom.js";
 import { updateExtras } from "./extras.js";
+import { wireTweaks } from "./tweaks.js";
 import { setupDropzone } from "./files.js";
 import { clearHistory, openHistory } from "./history.js";
 import { loadPlaylist, updateFolderHint, updatePlaylistSelection } from "./playlist.js";
@@ -11,7 +12,7 @@ import { cancelJob, openJobFolder, retryFailed } from "./playlist-job.js";
 import { clearUrl, downloadThumbnail, onUrlInput, previewUrl } from "./preview.js";
 import { buildWave } from "./progress.js";
 import { closeOnBackdrop, openSettings, saveSettings, updateYtdlp } from "./settings.js";
-import { checkSetup, revealLocalTools } from "./setup.js";
+import { checkSetup, quitApp, revealLocalTools } from "./setup.js";
 import { cancelSingleJob, onSubmit } from "./single-job.js";
 import { state } from "./state.js";
 import { onTabKeys, selectTab } from "./tabs.js";
@@ -46,6 +47,7 @@ els.jobCancel.addEventListener("click", cancelJob);
 els.jobRetry.addEventListener("click", retryFailed);
 els.settingsBtn.addEventListener("click", openSettings);
 els.historyBtn.addEventListener("click", openHistory);
+els.quitBtn.addEventListener("click", quitApp);
 els.settingsForm.addEventListener("submit", saveSettings);
 els.settingsClose.addEventListener("click", () => els.settingsDialog.close());
 els.ytdlpUpdate.addEventListener("click", updateYtdlp);
@@ -73,6 +75,7 @@ els.chips.addEventListener("change", (event) => {
 });
 els.qualitySelect.addEventListener("change", renderSpec);
 els.optSubs.addEventListener("change", updateExtras);
+wireTweaks();
 
 els.urlInput.addEventListener("input", onUrlInput);
 els.urlInput.addEventListener("keydown", (event) => {

@@ -1,6 +1,7 @@
 /* One link or file as a background job, and the Convert button. */
 
 import { currentQuality, isMuted } from "./catalog.js";
+import { collectTweaks } from "./tweaks.js";
 import { els } from "./dom.js";
 import { problemFrom, setProblem, setStatus } from "./errors.js";
 import { collectOptions } from "./extras.js";
@@ -46,6 +47,10 @@ function startFileJob() {
   data.append("mute", String(isMuted()));
   data.append("normalize", String(els.optNormalize.checked));
   data.append("title", els.fileTitleInput.value.trim());
+  const tweaks = collectTweaks();
+  if (tweaks.options) data.append("options", tweaks.options);
+  if (tweaks.audio) data.append("audio_file", tweaks.audio);
+  if (tweaks.subtitles) data.append("subtitle_file", tweaks.subtitles);
 
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();

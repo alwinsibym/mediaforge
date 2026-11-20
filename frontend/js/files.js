@@ -2,8 +2,10 @@
 
 import { els } from "./dom.js";
 import { formatSize } from "./format.js";
+import { resetFileInfo } from "./tweaks.js";
 
 function showSelectedFile() {
+  resetFileInfo();
   const file = els.fileInput.files[0];
   if (!file) {
     els.dropzoneText.textContent = "Choose an audio or video file, or drop it here";

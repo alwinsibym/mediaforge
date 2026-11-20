@@ -4,6 +4,7 @@ import { els } from "./dom.js";
 import { setStatus } from "./errors.js";
 import { updateExtras } from "./extras.js";
 import { formatSize } from "./format.js";
+import { setupTweaks, updateTweaks } from "./tweaks.js";
 import { state } from "./state.js";
 
 /* What each output format is made of, for the details panel. */
@@ -188,6 +189,7 @@ export function selectKind(kind, format) {
   renderQualityOptions();
   renderSpec();
   updateExtras();
+  updateTweaks();
 }
 
 export async function loadFormats() {
@@ -200,6 +202,7 @@ export async function loadFormats() {
     els.submitBtn.disabled = true;
     return;
   }
+  setupTweaks();
   selectKind("audio");
 }
 

@@ -13,7 +13,7 @@ Version tested: ________  Date: ________  Computer / internet speed: ________
 
 | Check | How | Needs you? |
 | --- | --- | --- |
-| Logic, errors, settings, security (230+ tests) | `pytest` and GitHub Actions on every push | No |
+| Logic, errors, settings, security (280+ tests) | `pytest` and GitHub Actions on every push | No |
 | Every output format on real media, with timings | `python scripts/selftest.py` (FFmpeg only, no internet) | No |
 | Which sites work, with the error code of each failure | `python scripts/check_sites.py sites.txt` writes `site-report.md` | A list of links you may copy |
 | Speed and 10-minute video timings (section 4) | Run the app with your own link and write the times | Yes |
@@ -175,3 +175,17 @@ For every failure, copy the technical details from the error card into the notes
 - [ ] README features and troubleshooting match what you saw above
 - [ ] Screenshot is current
 - [ ] Results of this checklist saved with the release notes
+
+## Tweaks on your own files (File tab)
+
+Use a short clip of your own, 20 to 60 seconds, with sound.
+
+- [ ] Show file info lists the codec, size, bitrate, audio and length
+- [ ] H.265, VP9 and AV1 each play in VLC (AV1 is slow; note the time)
+- [ ] Resize to 480p and to 1080p gives the expected height
+- [ ] "Make it smaller than 5 MB" gives a file under 5 MB that still looks fine
+- [ ] Volume 150, a 2 second fade in and fade out are heard; bass boost and virtual surround sound different on headphones
+- [ ] Replace the sound with another audio file; the video plays the new sound
+- [ ] A .srt file added as a track can be switched on in VLC; burned in is always visible
+- [ ] GIF and animated WebP of a 5 second clip play in the browser
+- [ ] Remove hidden details: the file's Properties no longer show the camera, GPS or title

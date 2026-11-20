@@ -4,6 +4,14 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+
+### Added
+- `scripts/record_demo.py` records the README demo GIF and MP4.
+- Tweaks on the File tab: video codec (H.264, H.265, VP9, AV1), resize 360p to 4K, compress to a target size, volume, fades and sound effects, replace or remove the sound, soft or burned-in subtitles, GIF or animated WebP, start and stop, remove hidden details, and a file info panel. New `/api/probe`; `/api/jobs/upload` takes `options`, `audio_file` and `subtitle_file`.
+- A desktop shortcut (`scripts/create_shortcut.py`) using the MediaForge logo as its icon. It starts the server without a console window, opens the browser, and reuses a copy that is already running.
+- `python run.py --open`, a Quit button in the page, and a log file at `data/mediaforge.log`.
+
 ## [0.3.0]
 
 ### Changed
