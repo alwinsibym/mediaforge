@@ -6,6 +6,8 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0]
+
 ### Added
 - `scripts/record_demo.py` records the README demo GIF and MP4.
 - Tweaks on the File tab: video codec (H.264, H.265, VP9, AV1), resize 360p to 4K, compress to a target size, volume, fades and sound effects, replace or remove the sound, soft or burned-in subtitles, GIF or animated WebP, start and stop, remove hidden details, and a file info panel. New `/api/probe`; `/api/jobs/upload` takes `options`, `audio_file` and `subtitle_file`.
