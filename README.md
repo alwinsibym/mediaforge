@@ -147,6 +147,14 @@ The two buttons in the header open **History** (finished downloads, each with **
 
 If YouTube keeps asking for a sign-in check during a long playlist, MediaForge waits and retries, and if it keeps happening it stops and keeps what it saved. Choose **Retry** later and the failed videos are saved into the same folder with their original numbers.
 
+### Check it first: a 10-second sample
+
+On the File tab, **Try a 10-second sample** converts ten seconds from the middle of your file with the choices you made, shows it in a player, and estimates the whole job ("the whole file: 38 MB, converting takes about 40 seconds"). The estimate comes from timing the sample, so it follows your codec, resize, size target and graphics card choices. It is an estimate, not a promise. The sample is deleted after 20 minutes.
+
+### Use my graphics card
+
+**Settings → Use my graphics card** encodes H.264 and H.265 video on an NVIDIA card (NVENC), which is usually several times faster than the processor. It is off by default. MediaForge tests the card by encoding one tiny frame, so the switch is greyed out if it will not work. If a conversion ever fails on the card, MediaForge turns the card off for that session and redoes the job on the processor. VP9 and AV1 always use the processor (the RTX 30 series cannot encode AV1).
+
 ### Tweaks for your own files
 
 On the **File** tab, open **Tweaks** to change a file while converting it. Nothing is required; leave it closed for a plain conversion.

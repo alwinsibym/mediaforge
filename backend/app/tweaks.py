@@ -9,7 +9,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import ffmpeg_locator, formats
+from . import ffmpeg_locator, formats, gpu
 from .features import parse_timestamp
 
 RESIZE_HEIGHTS = (360, 480, 720, 1080, 1440, 2160)
@@ -395,10 +395,14 @@ def audio_filters(tweaks: Tweaks, normalize: bool, duration: float | None) -> li
     return chain
 
 
-def video_args(fmt: str, tweaks: Tweaks, quality: str, bitrate_kbps: int | None) -> list[str]:
+def video_args(
+    fmt: str, tweaks: Tweaks, quality: str, bitrate_kbps: int | None, use_gpu: bool = False
+) -> list[str]:
     """Encoder arguments for the picture. `bitrate_kbps` switches from quality to a size target."""
     codec = tweaks.video_codec or {"webm": "vp9"}.get(fmt, "h264")
     kb = bitrate_kbps
+    if use_gpu and codec in ("h264", "h265"):
+        return gpu.args(codec, fmt, kb)
     if codec == "h264":
         args = ["-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
         args += (
@@ -487,6 +491,7 @@ def build_command(
     bitrate_kbps: int | None = None,
     audio_kbps: int | None = None,
     has_audio: bool = True,
+    use_gpu: bool = False,
 ) -> list[str]:
     """The FFmpeg arguments for one conversion with tweaks.
 
@@ -569,7 +574,7 @@ def build_command(
             vfilters.append(f"subtitles={subtitle_name}")
         if vfilters:
             command += ["-filter:v:0", ",".join(vfilters)]
-        command += video_args(fmt, tweaks, quality, bitrate_kbps)
+        command += video_args(fmt, tweaks, quality, bitrate_kbps, use_gpu)
         # sound
         if mute:
             command += ["-an"]

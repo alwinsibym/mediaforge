@@ -106,12 +106,26 @@ def _fake_convert(
     return out
 
 
+def _fake_sample(source, fmt, quality, workdir, *args, **kwargs):
+    out = Path(workdir) / f"sample.{fmt}"
+    out.write_bytes(b"z" * 2048)
+    return {
+        "path": out,
+        "sample_seconds": 10.0,
+        "sample_bytes": 2048,
+        "estimated_bytes": 38 * 1024 * 1024,
+        "estimated_seconds": 41.0,
+        "whole_seconds": 240.0,
+    }
+
+
 def _start_server() -> int:
     downloader.fetch_info = _fake_info
     downloader.fetch_playlist = _fake_playlist
     downloader.download_and_convert = _fake_download
     downloader.download_thumbnail = lambda *a, **k: None
     transcoder.convert_file = _fake_convert
+    transcoder.make_sample = _fake_sample
     transcoder.ffmpeg_available = lambda: True
     jobs.PACE_MIN = jobs.PACE_MAX = 0
     main._upgrade_ytdlp = lambda: {"before": "1", "after": "1", "changed": False}
@@ -209,6 +223,9 @@ def run(playwright, base: str, show: bool) -> None:
     page.wait_for_selector(".err-card", timeout=15000)
     code = page.inner_text(".err-code")
     page.click(".err-more summary")
+    page.wait_for_function(
+        "document.querySelector('#status').innerText.includes('What to do now')", timeout=5000
+    )
     check(
         "error card shows a code and an explanation",
         code.startswith("MF-") and "What to do now" in page.inner_text("#status"),
@@ -325,6 +342,17 @@ def run(playwright, base: str, show: bool) -> None:
     page.set_input_files("#tw-subs-file", str(srt))
     check("subtitle mode appears once a file is chosen", page.is_visible("#tw-subs-mode"))
     check("cover picture field shows for MP4", page.is_visible("#tw-cover-field"))
+    check("sample box is shown with a file chosen", page.is_enabled("#sample-btn"))
+    page.click("#sample-btn")
+    page.wait_for_selector("#sample-result:not([hidden])")
+    estimate = page.inner_text("#sample-estimate")
+    check("sample shows a size and time estimate", "38" in estimate and "MB" in estimate, estimate)
+    check("sample shows a player", page.locator("#sample-player video").count() == 1)
+    page.select_option("#tw-resize", "720")
+    check(
+        "changing a choice marks the sample as out of date",
+        page.locator("#sample-result.is-stale").count() == 1,
+    )
     SEEN_TWEAKS.clear()
     page.click("#submit-btn")
     for _ in range(100):
@@ -336,7 +364,7 @@ def run(playwright, base: str, show: bool) -> None:
     check(
         "tweaks reach the server",
         bool(tw)
-        and tw.resize == 480
+        and tw.resize == 720
         and tw.volume == 150
         and tw.strip_metadata
         and tw.subtitles == "soft"

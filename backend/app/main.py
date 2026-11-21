@@ -8,6 +8,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+import uuid
 from pathlib import Path
 from urllib.parse import quote
 
@@ -26,6 +29,7 @@ from . import (
     features,
     ffmpeg_locator,
     formats,
+    gpu,
     history,
     jobs,
     pending,
@@ -438,6 +442,97 @@ async def create_upload_job(
     return jobs.snapshot(job)
 
 
+_SAMPLES: dict[str, tuple[Path, float]] = {}
+_SAMPLE_LOCK = threading.Lock()
+SAMPLE_KEEP_SECONDS = 20 * 60
+
+
+def _forget_old_samples() -> None:
+    now = time.time()
+    for key, (folder, made) in list(_SAMPLES.items()):
+        if now - made > SAMPLE_KEEP_SECONDS:
+            shutil.rmtree(folder, ignore_errors=True)
+            del _SAMPLES[key]
+
+
+@app.post("/api/sample")
+async def make_sample(
+    file: UploadFile = File(...),
+    format: str = Form("mp3"),
+    quality: str | None = Form(None),
+    mute: bool = Form(False),
+    normalize: bool = Form(False),
+    options: str = Form(""),
+    audio_file: UploadFile | None = File(None),
+    subtitle_file: UploadFile | None = File(None),
+    cover_file: UploadFile | None = File(None),
+) -> dict:
+    """Convert about ten seconds with the chosen settings, so the result can be checked first.
+
+    Also estimates the size and time of the whole conversion.
+    """
+    try:
+        fmt, quality = formats.normalize(format, quality)
+        raw = json.loads(options) if options.strip() else {}
+        if not isinstance(raw, dict):
+            raise ValueError("The tweaks were not understood.")
+        chosen = tweaks.parse(
+            {**raw, "mute": mute},
+            fmt,
+            audio_file=bool(audio_file and audio_file.filename),
+            subtitle_file=bool(subtitle_file and subtitle_file.filename),
+            cover_file=bool(cover_file and cover_file.filename),
+        )
+    except json.JSONDecodeError:
+        raise _bad_request("The tweaks were not understood.") from None
+    except ValueError as exc:
+        raise _bad_request(exc) from exc
+    if not _SAMPLE_LOCK.acquire(blocking=False):
+        raise _bad_request("A sample is already being made. Wait for it to finish.")
+    folder = Path(tempfile.mkdtemp(prefix="mediaforge-sample-"))
+    try:
+        _forget_old_samples()
+        source = folder / ("source" + (Path(file.filename or "").suffix.lower() or ".bin"))
+        await _save_upload(file, source)
+        extra = folder / "extra"
+        audio = await _save_extra(audio_file, extra, "audio", None)
+        subs = await _save_extra(subtitle_file, extra, "subtitles", tweaks.SUBTITLE_EXTENSIONS)
+        cover = await _save_extra(cover_file, extra, "cover", tweaks.COVER_EXTENSIONS)
+        out_dir = folder / "out"
+        out_dir.mkdir()
+        result = await run_in_threadpool(
+            transcoder.make_sample, source, fmt, quality, out_dir, mute, normalize, chosen,
+            audio, subs, cover,
+        )  # fmt: skip
+        source.unlink(missing_ok=True)
+    except ConversionError as exc:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise _bad_request(exc) from exc
+    except Exception:
+        shutil.rmtree(folder, ignore_errors=True)
+        raise HTTPException(status_code=500, detail="Unexpected server error.") from None
+    finally:
+        _SAMPLE_LOCK.release()
+    key = uuid.uuid4().hex
+    _SAMPLES[key] = (folder, time.time())
+    path = result.pop("path")
+    result["url"] = f"/api/sample/{key}/{quote(path.name)}"
+    result["kind"] = path.suffix.lower().lstrip(".")
+    return result
+
+
+@app.get("/api/sample/{key}/{name}")
+def get_sample(key: str, name: str) -> FileResponse:
+    entry = _SAMPLES.get(key)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="That sample has expired. Make a new one.")
+    out_dir = entry[0] / "out"
+    path = out_dir / Path(name).name
+    if not path.is_file() or path.parent != out_dir:
+        raise HTTPException(status_code=404, detail="That sample has expired. Make a new one.")
+    return FileResponse(path)
+
+
 @app.post("/api/probe")
 async def probe_file(file: UploadFile = File(...)) -> dict:
     """Read the codec, bitrate, streams and length of a file, without converting it."""
@@ -535,7 +630,16 @@ def _settings_payload() -> dict:
         "max_parallel": settings.MAX_PARALLEL,
         "aria2c_installed": downloader.aria2c_available(),
         "impersonation_installed": downloader.impersonation_available(),
+        "gpu_card": gpu.detect() | {"turned_off": gpu.disabled_reason()},
     }
+
+
+@app.post("/api/gpu/test")
+async def test_gpu(request: Request) -> dict:
+    """Test the graphics card again, for example after a driver update."""
+    _local_only(request)
+    gpu.reset()
+    return await run_in_threadpool(gpu.detect)
 
 
 @app.get("/api/settings")

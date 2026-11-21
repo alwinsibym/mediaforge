@@ -280,6 +280,21 @@
           </div>
         </details>
 
+        <div id="sample-box" class="sample" hidden>
+          <div class="sample-head">
+            <div>
+              <strong>Check it before you convert</strong>
+              <span class="hint">Converts ten seconds with these settings, so you can see and hear the result and get a size and time estimate.</span>
+            </div>
+            <button type="button" id="sample-btn" class="btn btn-quiet" disabled>Try a 10-second sample</button>
+          </div>
+          <div id="sample-result" class="sample-result" hidden>
+            <p id="sample-estimate" class="sample-estimate"></p>
+            <div id="sample-player"></div>
+          </div>
+          <p id="sample-note" class="hint" aria-live="polite"></p>
+        </div>
+
         <button type="submit" id="submit-btn" class="btn btn-primary">Convert and download</button>
 
         <div id="progress" class="progress" hidden>
@@ -424,6 +439,9 @@
         <p class="hint">Two is a good start. Choose 1 if YouTube keeps asking for a sign-in check.</p>
         <label class="check"><input type="checkbox" id="set-aria2c"><span>Use aria2c for more connections per file</span></label>
         <p id="aria-hint" class="hint"></p>
+        <label class="check"><input type="checkbox" id="set-gpu"><span>Use my graphics card for video <small>NVIDIA only, H.264 and H.265</small></span></label>
+        <p id="gpu-hint" class="hint"></p>
+        <button type="button" id="gpu-test" class="btn btn-quiet">Test the card again</button>
       </section>
 
       <section class="dialog-section">

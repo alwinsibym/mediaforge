@@ -1,5 +1,6 @@
 """Convert local audio/video files with FFmpeg."""
 
+import dataclasses
 import re
 import shutil
 import subprocess
@@ -7,7 +8,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from . import ffmpeg_locator, formats
+from . import ffmpeg_locator, formats, gpu
 from . import tweaks as tw
 from .downloader import FFMPEG_HELP, ConversionError
 
@@ -58,6 +59,7 @@ def build_command(
     quality: str,
     mute: bool = False,
     normalize: bool = False,
+    use_gpu: bool = False,
 ) -> list[str]:
     """Build the ffmpeg argument list for converting `source` into `fmt`."""
     ffmpeg = ffmpeg_locator.find_tool("ffmpeg") or "ffmpeg"
@@ -89,7 +91,10 @@ def build_command(
             ]
             command += ["-an"] if mute else ["-c:a", "libopus"]
         else:  # mp4, mkv
-            command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
+            if use_gpu:
+                command += gpu.args("h264", fmt)
+            else:
+                command += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
             command += ["-an"] if mute else ["-c:a", "aac"]
             if fmt == "mp4":
                 command += ["-movflags", "+faststart"]
@@ -204,23 +209,21 @@ def convert_file(
     if target == source:
         target = workdir / f"{source.stem}-converted.{ext}"
 
-    command = build_command(source, target, fmt, quality, mute, normalize)
-    if progress is not None:
-        progress({"phase": "converting", "percent": 0})
-        code, error_text = _run_with_progress(command, media_duration(source), progress)
-    else:
-        try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=FFMPEG_TIMEOUT_SECONDS,
-            )
-        except subprocess.TimeoutExpired as exc:
-            raise ConversionError("The conversion took too long and was stopped.") from exc
-        code, error_text = result.returncode, result.stderr or ""
+    wants_gpu = (
+        formats.is_video(fmt)
+        and not formats.is_preset(fmt)
+        and fmt in ("mp4", "mkv")
+        and gpu.enabled("h264")
+    )
+    duration = media_duration(source)
+    for use_gpu in (True, False) if wants_gpu else (False,):
+        command = build_command(source, target, fmt, quality, mute, normalize, use_gpu)
+        if progress is not None:
+            progress({"phase": "converting", "percent": 0})
+        code, error_text = _run(command, duration, progress, workdir)
+        if (code == 0 and target.exists()) or not use_gpu:
+            break
+        gpu.disable("The graphics card could not encode, so the processor is used instead.")
 
     if code != 0 or not target.exists():
         detail = error_text.strip().splitlines()
@@ -299,7 +302,22 @@ def _convert_with_tweaks(
     if not has_audio and not mute and tweaks.changes_sound and not tweaks.replace_audio:
         raise ConversionError("This file has no sound, so the sound tweaks cannot be applied.")
 
+    codec = tweaks.video_codec or ("vp9" if fmt == "webm" else "h264")
+    gpu_codec = (
+        codec if formats.is_video(fmt) and not tweaks.animated and gpu.enabled(codec) else None
+    )
+
     def run(bitrate=None, audio_kbps=None):
+        for use_gpu in (True, False) if gpu_codec and gpu.enabled(gpu_codec) else (False,):
+            try:
+                _run_once(bitrate, audio_kbps, use_gpu)
+                return
+            except ConversionError:
+                if not use_gpu:
+                    raise
+                gpu.disable("The graphics card could not encode, so the processor is used instead.")
+
+    def _run_once(bitrate, audio_kbps, use_gpu):
         try:
             command = tw.build_command(
                 source,
@@ -318,6 +336,7 @@ def _convert_with_tweaks(
                 bitrate_kbps=bitrate,
                 audio_kbps=audio_kbps,
                 has_audio=has_audio,
+                use_gpu=use_gpu,
             )
         except ValueError as exc:
             raise ConversionError(str(exc)) from exc
@@ -357,6 +376,60 @@ def _convert_with_tweaks(
         f"Could not get this under {tweaks.target_mb:g} MB without ruining it. "
         "Try a larger size or a shorter clip."
     )
+
+
+SAMPLE_SECONDS = 10
+
+
+def make_sample(
+    source: Path,
+    fmt: str,
+    quality: str,
+    workdir: Path,
+    mute: bool = False,
+    normalize: bool = False,
+    tweaks: "tw.Tweaks | None" = None,
+    audio_file: Path | None = None,
+    subtitle_file: Path | None = None,
+    cover_file: Path | None = None,
+) -> dict:
+    """Convert a short piece from the middle of the file with the chosen settings.
+
+    Returns the sample's path and an estimate for the whole file: its size and how long the
+    conversion should take, worked out from how long and how big the sample turned out.
+    """
+    if not ffmpeg_available():
+        raise ConversionError(FFMPEG_HELP)
+    tweaks = tweaks or tw.Tweaks()
+    duration = media_duration(source)
+    full = tw.effective_duration(duration, tweaks)
+    if not full or full <= 0:
+        raise ConversionError(
+            "The length of this file could not be read, so no sample can be made."
+        )
+    begin = tweaks.start or 0.0
+    length = min(float(SAMPLE_SECONDS), full)
+    start = begin + max(0.0, (full - length) / 2)
+    scaled_target = tweaks.target_mb * length / full if tweaks.target_mb else None
+    sample_tweaks = dataclasses.replace(
+        tweaks, start=start, end=start + length, target_mb=scaled_target, title=None
+    )
+    started = time.monotonic()
+    path = convert_file(
+        source, fmt, quality, workdir, mute, None, normalize, sample_tweaks,
+        audio_file, subtitle_file, cover_file,
+    )  # fmt: skip
+    seconds = time.monotonic() - started
+    size = path.stat().st_size
+    whole = tweaks.target_mb * 1024 * 1024 if tweaks.target_mb else size / length * full
+    return {
+        "path": path,
+        "sample_seconds": round(length, 1),
+        "sample_bytes": size,
+        "estimated_bytes": int(whole),
+        "estimated_seconds": round(seconds / length * full, 1),
+        "whole_seconds": round(full, 1),
+    }
 
 
 def probe(path: Path) -> dict:

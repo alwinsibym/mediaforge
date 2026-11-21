@@ -39,6 +39,7 @@ export async function openSettings() {
     els.ariaHint.textContent = saved.aria2c_installed
       ? "aria2c was found. The progress bar cannot show a percentage while it is used."
       : "aria2c is not installed. On Windows: winget install aria2.aria2, then open this window again.";
+    showGpu(saved.gpu_card, saved.gpu);
     els.setProxy.value = saved.proxy || "";
     els.setImpersonate.checked = saved.impersonate && saved.impersonation_installed;
     els.setImpersonate.disabled = !saved.impersonation_installed;
@@ -65,6 +66,7 @@ export async function saveSettings(event) {
         cookies_file: els.setCookies.value.trim(),
         parallel: Number(els.setParallel.value),
         aria2c: els.setAria2c.checked,
+        gpu: els.setGpu.checked,
         proxy: els.setProxy.value.trim(),
         impersonate: els.setImpersonate.checked,
       }),
@@ -100,4 +102,32 @@ export function closeOnBackdrop(dialog) {
   dialog.addEventListener("click", (event) => {
     if (event.target === dialog) dialog.close();
   });
+}
+
+function showGpu(gpu, on) {
+  const works = gpu.h264 || gpu.h265;
+  els.setGpu.disabled = !works;
+  els.setGpu.checked = Boolean(on) && works;
+  if (!works) {
+    els.gpuHint.textContent = "No NVIDIA graphics card encoder was found. MediaForge keeps using the processor.";
+  } else if (gpu.turned_off) {
+    els.gpuHint.textContent = gpu.turned_off;
+  } else {
+    const kinds = [gpu.h264 && "H.264", gpu.h265 && "H.265"].filter(Boolean).join(" and ");
+    els.gpuHint.textContent = `${gpu.name || "Your graphics card"} can encode ${kinds}. If it ever fails, MediaForge goes back to the processor by itself.`;
+  }
+}
+
+export async function testGpu() {
+  els.gpuTest.disabled = true;
+  els.gpuHint.textContent = "Testing the card...";
+  try {
+    const response = await fetch("/api/gpu/test", { method: "POST" });
+    if (!response.ok) throw await problemFrom(response);
+    showGpu(await response.json(), els.setGpu.checked);
+  } catch (error) {
+    els.gpuHint.textContent = error.message || "The test could not run.";
+  } finally {
+    els.gpuTest.disabled = false;
+  }
 }

@@ -854,3 +854,122 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 @media (max-width: 480px) { .info-row { grid-template-columns: 1fr; gap: 0; } }
 .info-btn { margin-top: 10px; }
 .cover-preview { display: block; width: 96px; height: 96px; margin-top: 8px; object-fit: cover; border: 1px solid var(--line); border-radius: 8px; }
+
+/* Sample and estimate */
+.sample { margin: 18px 0 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; }
+.sample-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.sample-head > div { display: grid; gap: 2px; flex: 1 1 18rem; }
+.sample-result { margin-top: 12px; }
+.sample-result.is-stale { opacity: 0.55; }
+.sample-estimate { margin: 0 0 10px; font-weight: 600; }
+.sample-media { display: block; width: 100%; max-height: 320px; border-radius: 10px; background: #000; }
+audio.sample-media { background: none; }
+.sample.is-working .sample-head .btn { cursor: progress; }
+
+/* ---------------------------------------------------------------------------------------------
+   Polish: movement that shows what changed, tidier controls, a two-column Tweaks section.
+   --------------------------------------------------------------------------------------------- */
+:root { --ease: cubic-bezier(0.22, 0.8, 0.28, 1); --ring: color-mix(in srgb, var(--accent) 24%, transparent); }
+html { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* Things that appear slide up a little and fade in */
+@keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.panel:not([hidden]), .preview:not([hidden]), .sample-result:not([hidden]), .file-info:not([hidden]),
+.progress:not([hidden]), .status:not(:empty), .sample:not([hidden]), .cover-preview:not([hidden]) {
+  animation: appear 0.26s var(--ease) both;
+}
+
+/* Buttons respond to the hand */
+.btn, .icon-btn, .source-tab, .segment span, .chip span {
+  transition: background-color 0.16s, border-color 0.16s, color 0.16s, box-shadow 0.2s var(--ease), transform 0.12s var(--ease);
+}
+.btn:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+.btn-primary { box-shadow: 0 10px 22px -12px var(--accent); }
+.btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 14px 26px -12px var(--accent); }
+.btn-primary:active:not(:disabled) { transform: translateY(1px) scale(0.995); box-shadow: 0 6px 14px -10px var(--accent); }
+.btn-quiet:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-soft) 70%, var(--accent) 12%); }
+.chip:hover span { transform: translateY(-1px); }
+
+/* One focus look for every field */
+select, input[type="text"], input[type="password"], input[type="search"], .field input {
+  transition: border-color 0.16s, box-shadow 0.2s var(--ease), background-color 0.16s;
+}
+select:hover, input[type="text"]:hover { border-color: var(--accent); }
+select:focus-visible, input[type="text"]:focus-visible, input[type="password"]:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* File pickers as pills, instead of the browser's grey button */
+input[type="file"] { font: inherit; color: var(--muted); max-width: 100%; }
+input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 14px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.16s, background-color 0.16s;
+}
+input[type="file"]::file-selector-button:hover { border-color: var(--accent); }
+.dropzone { transition: border-color 0.18s, background-color 0.18s, transform 0.18s var(--ease); }
+.dropzone.is-over { transform: scale(1.01); }
+
+/* Sections open and close smoothly where the browser supports it */
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 0.28s var(--ease), content-visibility 0.28s allow-discrete;
+  }
+  details[open]::details-content { block-size: auto; }
+}
+details > summary { transition: color 0.16s; list-style-position: outside; }
+
+/* Tweaks: two columns on a wide screen, in groups */
+.tweaks > summary { font-size: 1rem; color: var(--text); }
+.tweaks > summary small { display: inline; margin-left: 8px; font-weight: 400; }
+.tweaks .extras-body { gap: 14px 20px; }
+@media (min-width: 700px) {
+  .tweaks .extras-body { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .tweaks .tw-group, .tweaks #tw-trim, .tweaks #tw-note, .tweaks #tw-meta-field { grid-column: 1 / -1; }
+  .tweaks .tw-group { padding: 14px 16px 16px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+  .tweaks .tw-group .mini-field select, .tweaks .tw-group .mini-field input[type="text"] { background: var(--surface); }
+}
+.tw-group legend { padding: 0 6px; margin-left: -6px; }
+.tweaks .trim-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+
+/* Check-it-first card, calmer and clearer */
+.sample { background: linear-gradient(180deg, var(--surface-2), var(--surface)); }
+.sample-estimate { font-family: var(--font-display); font-size: 1.05rem; }
+.sample.is-working .sample-head .btn { position: relative; padding-left: 38px; }
+.sample.is-working .sample-head .btn::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: turn 0.8s linear infinite;
+}
+@keyframes turn { to { transform: rotate(360deg); } }
+
+/* The meter glides, and the headline numbers do not jitter */
+.bar span { transition: width 0.5s var(--ease); }
+.progress-text, .spec dd, .sample-estimate { font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+  .btn-primary:hover:not(:disabled), .chip:hover span, .dropzone.is-over { transform: none; }
+}

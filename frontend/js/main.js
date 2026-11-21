@@ -4,6 +4,7 @@ import { ensureLoggedIn } from "./auth.js";
 import { loadFormats, renderQualityOptions, renderSpec, selectKind } from "./catalog.js";
 import { els } from "./dom.js";
 import { updateExtras } from "./extras.js";
+import { markSampleStale, wireSample } from "./sample.js";
 import { wireTweaks } from "./tweaks.js";
 import { setupDropzone } from "./files.js";
 import { clearHistory, openHistory } from "./history.js";
@@ -11,7 +12,7 @@ import { loadPlaylist, updateFolderHint, updatePlaylistSelection } from "./playl
 import { cancelJob, openJobFolder, retryFailed } from "./playlist-job.js";
 import { clearUrl, downloadThumbnail, onUrlInput, previewUrl } from "./preview.js";
 import { buildWave } from "./progress.js";
-import { closeOnBackdrop, openSettings, saveSettings, updateYtdlp } from "./settings.js";
+import { closeOnBackdrop, openSettings, saveSettings, testGpu, updateYtdlp } from "./settings.js";
 import { checkSetup, quitApp, revealLocalTools } from "./setup.js";
 import { cancelSingleJob, onSubmit } from "./single-job.js";
 import { state } from "./state.js";
@@ -49,6 +50,7 @@ els.settingsBtn.addEventListener("click", openSettings);
 els.historyBtn.addEventListener("click", openHistory);
 els.quitBtn.addEventListener("click", quitApp);
 els.settingsForm.addEventListener("submit", saveSettings);
+els.gpuTest.addEventListener("click", testGpu);
 els.settingsClose.addEventListener("click", () => els.settingsDialog.close());
 els.ytdlpUpdate.addEventListener("click", updateYtdlp);
 els.historyClose.addEventListener("click", () => els.historyDialog.close());
@@ -76,6 +78,13 @@ els.chips.addEventListener("change", (event) => {
 els.qualitySelect.addEventListener("change", renderSpec);
 els.optSubs.addEventListener("change", updateExtras);
 wireTweaks();
+wireSample();
+els.form.addEventListener("change", (event) => {
+  if (event.target !== els.fileInput) markSampleStale();
+});
+els.form.addEventListener("input", (event) => {
+  if (event.target.type !== "file") markSampleStale();
+});
 
 els.urlInput.addEventListener("input", onUrlInput);
 els.urlInput.addEventListener("keydown", (event) => {

@@ -17,6 +17,7 @@ DEFAULTS = {
     "parallel": 2,  # playlist videos downloaded at the same time
     "aria2c": False,  # use aria2c (if installed) for more connections per file
     "proxy": "",  # send requests through this proxy, such as socks5://127.0.0.1:1080
+    "gpu": False,  # encode H.264 / H.265 on an NVIDIA graphics card when it works
     "impersonate": False,  # present requests like Chrome (needs the curl_cffi package)
 }
 PROXY_SCHEMES = ("http", "https", "socks4", "socks5", "socks5h")
@@ -70,6 +71,8 @@ def validate(update: dict) -> dict:
         clean["aria2c"] = bool(update["aria2c"])
     if "proxy" in update:
         clean["proxy"] = _check_proxy(str(update["proxy"] or ""))
+    if "gpu" in update:
+        clean["gpu"] = bool(update["gpu"])
     if "impersonate" in update:
         clean["impersonate"] = bool(update["impersonate"])
     return clean
