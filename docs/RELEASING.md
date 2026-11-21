@@ -23,8 +23,9 @@ Below 1.0.0 means "still changing". 1.0.0 is the first release the project calls
    git tag -a v0.3.0 -m "MediaForge 0.3.0"
    git push origin main --tags
    ```
-6. On GitHub, open **Releases**, choose **Draft a new release**, pick the tag `v0.3.0`, paste the
-   changelog entry and publish. GitHub adds a source download automatically.
+6. Pushing the tag publishes the GitHub release by itself (`.github/workflows/release.yml`), with the
+   changelog section as the notes. For a tag made earlier, open **Actions**, choose **release**,
+   click **Run workflow** and type the tag, for example `v0.1.0`.
 
 The running app shows its version at `/api/health`.
 

@@ -6,6 +6,10 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A release workflow: pushing a version tag publishes the GitHub release with the changelog section as its notes, and it can be run by hand for older tags.
+
 ### Changed
 
 - Fluid layout: type, spacing, card padding and corner radius now scale smoothly with the screen width, cards flow into as many columns as fit, the options inside the converter adapt to the converter's own width, panels ease open instead of snapping, and the header never wraps on tablets.

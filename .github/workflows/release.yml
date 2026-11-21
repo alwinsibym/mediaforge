@@ -1,0 +1,39 @@
+name: release
+
+# Publishes a GitHub release for a version tag, using that version's CHANGELOG section as the notes.
+#   - Push a tag such as v1.2.0 and the release appears.
+#   - Or open Actions > release > Run workflow and type an existing tag (for tags made earlier).
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish, for example v0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "A release for $TAG already exists."
+            exit 0
+          fi
+          python scripts/release_notes.py "$TAG" > notes.md
+          flags=""
+          if [ "${{ github.event_name }}" = "push" ]; then flags="--latest"; fi
+          gh release create "$TAG" --verify-tag $flags \
+            --title "MediaForge ${TAG#v}" --notes-file notes.md
