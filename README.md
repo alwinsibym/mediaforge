@@ -68,6 +68,8 @@ docker compose up --build
 
 Open <http://localhost:8000>.
 
+New to this? [docs/INSTALL.md](docs/INSTALL.md) is a step-by-step Windows guide with pictures.
+
 ## Manual setup
 
 1. Install FFmpeg.
