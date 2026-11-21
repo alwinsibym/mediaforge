@@ -206,5 +206,5 @@ Use a short clip of your own, 20 to 60 seconds, with sound.
 - [ ] A finished download shows a green tick that draws itself, with one soft pulse around the card
 - [ ] Settings saved shows the same tick
 - [ ] The three How it works cards show pictures in light and dark themes, and on a phone
-- [ ] The footer links open (source, what is new, report a problem, licence) and shows the version, v1.0.0
+- [ ] The footer links open (source, what is new, report a problem, licence) and shows the version, v1.1.0
 - [ ] With "Reduce motion" turned on in Windows, nothing floats or slides
