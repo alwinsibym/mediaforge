@@ -1,0 +1,29 @@
+/* Confirmations: a tick that draws itself, and one soft pulse around the card when work finishes. */
+
+.status.is-success { display: flex; align-items: center; gap: 10px; }
+.tick { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; }
+.tick svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tick-ring { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0.45; animation: draw 0.55s var(--ease) 0.05s forwards; }
+.tick-path { stroke-dasharray: 1; stroke-dashoffset: 1; stroke-width: 2.4; animation: draw 0.4s var(--ease) 0.4s forwards; }
+.tick { animation: pop 0.5s var(--ease) 0.7s both; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { 0% { transform: scale(1); } 45% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+/* A ring of green that fades out around the converter when a job finishes */
+.converter { position: relative; }
+.converter.is-done::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--success);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: done-ring 1.4s var(--ease) forwards;
+}
+@keyframes done-ring { 0% { opacity: 0.9; transform: scale(1); } 100% { opacity: 0; transform: scale(1.025); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tick-ring, .tick-path { animation: none; stroke-dashoffset: 0; }
+  .tick { animation: none; }
+  .converter.is-done::after { animation: none; opacity: 0; }
+}

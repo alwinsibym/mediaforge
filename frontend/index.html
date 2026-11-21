@@ -22,8 +22,30 @@
     } catch (e) { /* storage is unavailable: follow the system */ }
   </script>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/splash.css">
+  <link rel="stylesheet" href="css/feedback.css">
+  <link rel="stylesheet" href="css/illustrations.css">
+  <link rel="stylesheet" href="css/footer.css">
+  <script>
+    /* The opening screen is shown once per session. */
+    try { if (sessionStorage.getItem("mediaforge-splash") === "1") document.documentElement.classList.add("no-splash"); } catch (e) { /* show it */ }
+  </script>
 </head>
 <body>
+  <div id="splash" class="splash" aria-hidden="true">
+    <div class="splash-inner">
+      <svg class="splash-mark" viewBox="0 0 32 32">
+        <rect width="32" height="32" rx="9" class="mark-bg"/>
+        <rect x="6" y="13" width="3.4" height="6" rx="1.7" class="splash-bar" style="--i:0"/>
+        <rect x="11.2" y="8" width="3.4" height="16" rx="1.7" class="splash-bar" style="--i:1"/>
+        <rect x="16.4" y="11" width="3.4" height="10" rx="1.7" class="splash-bar" style="--i:2"/>
+        <rect x="21.6" y="6" width="3.4" height="20" rx="1.7" class="splash-bar" style="--i:3"/>
+      </svg>
+      <span class="splash-name">MediaForge</span>
+      <span class="splash-track"><span></span></span>
+    </div>
+  </div>
+
   <a class="skip-link" href="#convert-form">Skip to the converter</a>
 
   <header class="site-header">
@@ -334,16 +356,100 @@
       <h2>How it works</h2>
       <ol class="steps">
         <li>
+          <div class="step-art" aria-hidden="true">
+            <svg viewBox="0 0 240 150" focusable="false">
+              <ellipse class="art-shadow" cx="120" cy="138" rx="78" ry="7"/>
+              <g class="art-float">
+                <rect class="art-side" x="30" y="30" width="132" height="88" rx="13"/>
+                <rect class="art-card" x="24" y="22" width="132" height="88" rx="13"/>
+                <path class="art-bar" d="M24 35a13 13 0 0 1 13-13h106a13 13 0 0 1 13 13v6H24z"/>
+                <circle class="art-dot-a" cx="38" cy="32" r="3.2"/><circle class="art-dot-b" cx="48" cy="32" r="3.2"/><circle class="art-dot-c" cx="58" cy="32" r="3.2"/>
+                <rect class="art-soft" x="70" y="27" width="74" height="10" rx="5"/>
+                <g class="art-link" transform="rotate(-38 90 76)">
+                  <rect x="64" y="66" width="30" height="20" rx="10"/>
+                  <rect x="86" y="66" width="30" height="20" rx="10"/>
+                </g>
+                <rect class="art-soft" x="40" y="96" width="56" height="6" rx="3"/>
+              </g>
+              <g class="art-float art-float-late">
+                <rect class="art-side" x="150" y="64" width="62" height="74" rx="11"/>
+                <rect class="art-card" x="144" y="58" width="62" height="74" rx="11"/>
+                <circle class="art-accent" cx="175" cy="88" r="15"/>
+                <path class="art-white" d="M171 81l12 7-12 7z"/>
+                <rect class="art-soft" x="156" y="112" width="38" height="6" rx="3"/>
+                <rect class="art-soft" x="160" y="122" width="30" height="5" rx="2.5"/>
+              </g>
+              <path class="art-cursor" d="M118 100l-4 26 7-6 5 11 6-3-5-11 9-1z"/>
+              <path class="art-spark" d="M214 36v10M209 41h10"/><path class="art-spark" d="M20 78v8M16 82h8"/>
+            </svg>
+          </div>
+          <div class="step-body">
           <h3>Choose what to convert</h3>
           <p>Paste a link to a video or a whole playlist, or pick an audio or video file from your computer.</p>
+          </div>
         </li>
         <li>
+          <div class="step-art" aria-hidden="true">
+            <svg viewBox="0 0 240 150" focusable="false">
+              <ellipse class="art-shadow" cx="120" cy="138" rx="84" ry="7"/>
+              <g transform="rotate(-9 66 100)">
+                <rect class="art-side" x="40" y="46" width="62" height="84" rx="12"/>
+                <rect class="art-card" x="34" y="40" width="62" height="84" rx="12"/>
+                <path class="art-note" d="M58 82V64l16-4v18"/><circle class="art-note-dot" cx="55" cy="83" r="4.4"/><circle class="art-note-dot" cx="71" cy="79" r="4.4"/>
+                <text class="art-label" x="65" y="110" text-anchor="middle">MP3</text>
+              </g>
+              <g transform="rotate(9 174 100)">
+                <rect class="art-side" x="144" y="46" width="62" height="84" rx="12"/>
+                <rect class="art-card" x="138" y="40" width="62" height="84" rx="12"/>
+                <path class="art-wave" d="M166 82v-4M171 88V72M176 94V66M181 86V74M186 92V68M191 84v-4"/>
+                <text class="art-label" x="181" y="110" text-anchor="middle">WAV</text>
+              </g>
+              <g class="art-float">
+                <rect class="art-side-strong" x="94" y="32" width="68" height="92" rx="13"/>
+                <rect class="art-accent" x="88" y="26" width="68" height="92" rx="13"/>
+                <rect class="art-gloss" x="95" y="32" width="54" height="10" rx="5"/>
+                <rect class="art-white" x="102" y="52" width="40" height="28" rx="6"/>
+                <path class="art-play" d="M118 58l12 8-12 8z"/>
+                <text class="art-label art-label-on" x="122" y="106" text-anchor="middle">MP4</text>
+                <circle class="art-ok" cx="152" cy="30" r="11"/>
+                <path class="art-check" d="M146.5 30.5l4 4 7-8"/>
+              </g>
+              <path class="art-spark" d="M26 30v10M21 35h10"/><path class="art-spark" d="M214 112v8M210 116h8"/>
+            </svg>
+          </div>
+          <div class="step-body">
           <h3>Pick a format</h3>
           <p>Choose audio or video, then a format and quality. The details panel shows what you will get.</p>
+          </div>
         </li>
         <li>
+          <div class="step-art" aria-hidden="true">
+            <svg viewBox="0 0 240 150" focusable="false">
+              <ellipse class="art-shadow" cx="120" cy="138" rx="80" ry="7"/>
+              <rect class="art-side" x="52" y="92" width="136" height="42" rx="12"/>
+              <path class="art-tray-back" d="M60 90l10-14h100l10 14z"/>
+              <rect class="art-card" x="52" y="86" width="136" height="42" rx="12"/>
+              <rect class="art-soft" x="72" y="102" width="96" height="9" rx="4.5"/>
+              <rect class="art-accent art-fill" x="72" y="102" width="68" height="9" rx="4.5"/>
+              <g class="art-drop">
+                <circle class="art-side-strong" cx="120" cy="58" r="33"/>
+                <circle class="art-accent" cx="120" cy="53" r="33"/>
+                <ellipse class="art-gloss" cx="108" cy="36" rx="14" ry="6"/>
+                <path class="art-arrow" d="M120 36v28M107 53l13 13 13-13"/>
+              </g>
+              <g class="art-float-late">
+                <circle class="art-ok" cx="190" cy="82" r="14"/>
+                <path class="art-check" d="M183 82.5l5 5 9-10"/>
+              </g>
+              <circle class="art-confetti-a" cx="48" cy="52" r="4"/><circle class="art-confetti-b" cx="200" cy="38" r="3.4"/>
+              <rect class="art-confetti-c" x="36" y="92" width="8" height="4" rx="2" transform="rotate(-30 40 94)"/>
+              <path class="art-spark" d="M206 108v8M202 112h8"/>
+            </svg>
+          </div>
+          <div class="step-body">
           <h3>Download the result</h3>
           <p>Links are fetched with yt-dlp and converted with FFmpeg. Temporary files are deleted when the download finishes.</p>
+          </div>
         </li>
       </ol>
     </section>
@@ -401,9 +507,44 @@
   </main>
 
   <footer class="site-footer">
-    <div class="wrap footer-bar">
-      <p>MediaForge is open source under the MIT licence. Built with FastAPI, yt-dlp and FFmpeg.</p>
-      <p><a href="https://github.com/alwinsibym/mediaforge" rel="noopener">View the source on GitHub</a></p>
+    <div class="wrap footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="#top" aria-label="MediaForge, back to the top">
+          <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="9" class="mark-bg"/>
+            <rect x="6" y="13" width="3.4" height="6" rx="1.7" class="mark-bar"/>
+            <rect x="11.2" y="8" width="3.4" height="16" rx="1.7" class="mark-bar"/>
+            <rect x="16.4" y="11" width="3.4" height="10" rx="1.7" class="mark-bar"/>
+            <rect x="21.6" y="6" width="3.4" height="20" rx="1.7" class="mark-bar"/>
+          </svg>
+          <span>MediaForge</span>
+        </a>
+        <p>A free video and audio converter that runs on your own computer. Your files stay with you.</p>
+      </div>
+      <nav class="footer-col" aria-label="Explore">
+        <h2>Explore</h2>
+        <a href="#top">Converter</a>
+        <a href="#how">How it works</a>
+        <a href="#formats">Formats</a>
+        <a href="#faq">Questions</a>
+      </nav>
+      <nav class="footer-col" aria-label="Project">
+        <h2>Project</h2>
+        <a href="https://github.com/alwinsibym/mediaforge" rel="noopener">Source code</a>
+        <a href="https://github.com/alwinsibym/mediaforge/blob/main/CHANGELOG.md" rel="noopener">What is new</a>
+        <a href="https://github.com/alwinsibym/mediaforge/issues/new" rel="noopener">Report a problem</a>
+        <a href="https://github.com/alwinsibym/mediaforge/blob/main/LICENSE" rel="noopener">MIT licence</a>
+      </nav>
+      <nav class="footer-col" aria-label="Built with">
+        <h2>Built with</h2>
+        <a href="https://fastapi.tiangolo.com" rel="noopener">FastAPI</a>
+        <a href="https://github.com/yt-dlp/yt-dlp" rel="noopener">yt-dlp</a>
+        <a href="https://ffmpeg.org" rel="noopener">FFmpeg</a>
+      </nav>
+    </div>
+    <div class="wrap footer-base">
+      <p>Open source and made to run locally. Only download what you are allowed to.</p>
+      <p class="footer-meta"><span class="version-chip" data-version>v5.0.0</span><a href="#top" class="to-top">Back to top</a></p>
     </div>
   </footer>
 

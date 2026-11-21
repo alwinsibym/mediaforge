@@ -317,6 +317,15 @@ def run(playwright, base: str, show: bool) -> None:
         upload.value.suggested_filename,
     )
 
+    # opening screen, illustrations, footer, completion tick
+    check("opening screen leaves once the page is ready", page.locator("#splash").count() == 0)
+    check("how it works has three illustrations", page.locator(".step-art svg").count() == 3)
+    check("footer shows the running version", page.inner_text("[data-version]").startswith("v"))
+    page.evaluate("import('/js/errors.js').then(m => m.setStatus('Done: test.mp3.', 'success'))")
+    page.wait_for_selector("#status .tick")
+    check("a finished action shows a tick", "Done" in page.inner_text("#status"))
+    page.evaluate("import('/js/errors.js').then(m => m.setStatus(''))")
+
     # tweaks on the File tab
     check("tweaks section is on the File tab", page.is_visible("#tweaks"))
     page.click("#tweaks summary")

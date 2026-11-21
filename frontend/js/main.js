@@ -7,6 +7,7 @@ import { updateExtras } from "./extras.js";
 import { markSampleStale, wireSample } from "./sample.js";
 import { wireTweaks } from "./tweaks.js";
 import { setupDropzone } from "./files.js";
+import { hideSplash } from "./splash.js";
 import { clearHistory, openHistory } from "./history.js";
 import { loadPlaylist, updateFolderHint, updatePlaylistSelection } from "./playlist.js";
 import { cancelJob, openJobFolder, retryFailed } from "./playlist-job.js";
@@ -21,9 +22,8 @@ import { applyTheme, chooseTheme, savedTheme } from "./theme.js";
 
 async function startUp() {
   await ensureLoggedIn();
-  loadFormats();
-  checkSetup();
-  revealLocalTools();
+  await Promise.allSettled([loadFormats(), checkSetup(), revealLocalTools()]);
+  hideSplash();
 }
 
 els.tabUrl.addEventListener("click", () => selectTab("url"));

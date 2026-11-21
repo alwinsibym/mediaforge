@@ -1,6 +1,7 @@
 /* One link or file as a background job, and the Convert button. */
 
 import { currentQuality, isMuted } from "./catalog.js";
+import { pulseDone } from "./feedback.js";
 import { buildFileForm } from "./upload-form.js";
 import { els } from "./dom.js";
 import { problemFrom, setProblem, setStatus } from "./errors.js";
@@ -86,6 +87,7 @@ function finishSingle(kind, message, info = null) {
   state.jobId = null;
   setBusy(false);
   setStatus(message, kind, info);
+  if (kind === "success") pulseDone(els.form);
 }
 
 export function renderSingleJob(job) {

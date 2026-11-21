@@ -545,8 +545,6 @@ summary::-webkit-details-marker { display: none; }
 .faq details p { max-width: 64ch; padding: 0 2px 20px; color: var(--muted); }
 
 /* Footer */
-.site-footer { border-top: 1px solid var(--line); background: var(--surface); }
-.footer-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; padding-top: 24px; padding-bottom: 28px; color: var(--muted); font-size: 0.9rem; }
 
 /* Small screens */
 @media (max-width: 760px) {
@@ -826,8 +824,6 @@ a.btn { display: inline-flex; align-items: center; justify-content: center; text
 .mini-field.rename input { width: 100%; padding: 9px 12px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font: inherit; }
 #panel-file .mini-field.rename { max-width: none; }
 
-.stopped { text-align: center; padding: 20vh 16px; }
-.stopped h1 { margin: 0 0 8px; }
 
 /* Tweaks (File tab) */
 .tweaks { margin-top: 14px; }
