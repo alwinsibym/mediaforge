@@ -30,6 +30,7 @@ os.environ["MEDIAFORGE_DATA_DIR"] = str(_TMP / "data")
 import uvicorn  # noqa: E402
 
 from app import config, downloader, jobs, main, transcoder  # noqa: E402
+from app import tweaks as tweaks_module  # noqa: E402
 from app.downloader import ConversionError  # noqa: E402
 
 THUMB = (
@@ -126,6 +127,15 @@ def _start_server() -> int:
     downloader.download_thumbnail = lambda *a, **k: None
     transcoder.convert_file = _fake_convert
     transcoder.make_sample = _fake_sample
+    # The page is tested, not this computer's FFmpeg: offer every spatial preset.
+    _real_caps = tweaks_module.capabilities
+
+    def _all_spatial():
+        caps = dict(_real_caps())
+        caps["spatial"] = {name: True for name in tweaks_module.spatial_mod.PRESETS}
+        return caps
+
+    tweaks_module.capabilities = _all_spatial
     transcoder.ffmpeg_available = lambda: True
     jobs.PACE_MIN = jobs.PACE_MAX = 0
     main._upgrade_ytdlp = lambda: {"before": "1", "after": "1", "changed": False}
@@ -345,6 +355,14 @@ def run(playwright, base: str, show: bool) -> None:
     )
     page.select_option("#tw-resize", "480")
     page.fill("#tw-volume", "150")
+    page.select_option("#tw-spatial", "front")
+    check("a fixed position has no speed box", not page.is_visible("#tw-spatial-speed-field"))
+    page.select_option("#tw-spatial", "orbit")
+    check(
+        "orbit shows a speed box and a hint",
+        page.is_visible("#tw-spatial-speed-field") and page.is_visible("#tw-spatial-hint"),
+    )
+    page.fill("#tw-spatial-speed", "5")
     page.check("#tw-meta")
     srt = _TMP / "x.srt"
     srt.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n")
@@ -376,6 +394,8 @@ def run(playwright, base: str, show: bool) -> None:
         and tw.resize == 720
         and tw.volume == 150
         and tw.strip_metadata
+        and tw.spatial == "orbit"
+        and tw.spatial_seconds == 5
         and tw.subtitles == "soft"
         and seen[2],
         repr(seen),
@@ -390,6 +410,15 @@ def run(playwright, base: str, show: bool) -> None:
         "phone layout has no sideways scrolling",
         not phone.evaluate("document.documentElement.scrollWidth > innerWidth"),
     )
+
+    for width in (320, 280):
+        narrow = new_page(width=width)
+        narrow.goto(base)
+        narrow.wait_for_selector(".chip")
+        check(
+            f"{width}px wide has no sideways scrolling",
+            not narrow.evaluate("document.documentElement.scrollWidth > innerWidth"),
+        )
 
     check("no JavaScript errors", not page_errors, "; ".join(page_errors))
 

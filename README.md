@@ -162,7 +162,7 @@ On the **File** tab, open **Tweaks** to change a file while converting it. Nothi
 - **Video codec**: H.264, H.265, VP9 or AV1 (the list greys out what your FFmpeg cannot do).
 - **Resize**: 360p up to 4K, up or down.
 - **Make it smaller than**: give a size in MB. MediaForge plans the bitrate for the clip length and retries if the first try was too big.
-- **Sound**: volume, fade in, fade out, and a sound effect (bass boost, treble boost, clearer voice, wider stereo, headphone crossfeed, virtual surround). "Even out the volume" is under More options. You can also replace the sound with another audio file, or tick "Remove the sound" for a silent video. Audio-only extraction is the Audio type.
+- **Sound**: volume, fade in, fade out, and a sound effect (bass boost, treble boost, clearer voice, wider stereo, headphone crossfeed, virtual surround) and spatial sound (below). "Even out the volume" is under More options. You can also replace the sound with another audio file, or tick "Remove the sound" for a silent video. Audio-only extraction is the Audio type.
 - **Cover picture**: replace the thumbnail shown in players and file managers (MP3, M4A, FLAC, MP4, MKV). JPG, PNG or WebP.
 - **Subtitles**: add an .srt, .vtt or .ass file as a selectable track, or burn it into the picture.
 - **Start and stop**: keep only part of the file.
@@ -171,6 +171,18 @@ On the **File** tab, open **Tweaks** to change a file while converting it. Nothi
 - **Show file info**: codec, bitrate, streams and length, without converting.
 
 The Sony car presets do not take tweaks.
+
+### Spatial sound (use headphones)
+
+Under Tweaks, **Spatial sound** places the sound around your head, or moves it. It works for audio and video output. It uses FFmpeg's `sofalizer` filter with a measured head model (MIT KEMAR, bundled in `backend/app/data`, see `HRTF-NOTICE.txt`).
+
+- **Orbit around your head (8D)**: the sound circles you. Choose how many seconds one full turn takes (2 to 60).
+- **Travel front to back**: the sound passes from in front of you to behind and back.
+- **From the front, behind, the left side, the right side or above**: every sound comes from that spot.
+- **Speakers in a room**: keeps the stereo picture, as two speakers placed in front of you.
+- **Movie-style surround**: a 5.1 film mix keeps its front, side and rear sound on headphones. A stereo file is spread into 5.1 first, which is a guess.
+
+Spatial sound only works on headphones, and it is a simulation: a normal file has no stored positions. Turn Windows Sonic or Dolby Atmos off while you listen, or they will reshape the result again. If the head model file or the `sofalizer` filter is missing, only the Orbit option stays, as a simple left-right sweep.
 
 ### Playlists
 

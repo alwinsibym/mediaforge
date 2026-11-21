@@ -101,7 +101,14 @@ def test_subtitle_names_never_reach_the_filter_from_the_person(tmp_path):
 
 def test_capabilities_have_every_key():
     caps = tweaks.capabilities()
-    assert set(caps) == {"video_codecs", "effects", "subtitles_burn", "animated"}
+    assert set(caps) == {
+        "video_codecs",
+        "effects",
+        "spatial",
+        "spatial_hrtf",
+        "subtitles_burn",
+        "animated",
+    }
     assert set(caps["video_codecs"]) == set(tweaks.VIDEO_CODECS)
 
 

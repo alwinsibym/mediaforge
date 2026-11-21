@@ -1,0 +1,8 @@
+hrtf.sofa is the "MIT KEMAR, normal pinna" head-related transfer function set, in SOFA format
+(the same file that ships with the free libmysofa library).
+
+Measurements: Bill Gardner and Keith Martin, MIT Media Lab, 1994,
+"HRTF Measurements of a KEMAR Dummy-Head Microphone". The MIT Media Lab allows free use of the
+data, including in commercial work, when the source is credited.
+
+MediaForge only uses it to make FFmpeg's "sofalizer" filter place sound around the head.

@@ -237,6 +237,12 @@ def _has_audio(path: Path) -> bool:
     return bool(probe(path).get("audio"))
 
 
+def _audio_channels(path: Path) -> str | None:
+    """'stereo', '5.1' and so on for the first sound track, if FFmpeg reported it."""
+    tracks = probe(path).get("audio") or []
+    return tracks[0].get("channels") if tracks else None
+
+
 def _run(command: list[str], duration: float | None, progress, cwd: Path) -> tuple[int, str]:
     if progress is not None:
         return _run_with_progress(command, duration, progress, cwd=cwd)
@@ -299,6 +305,7 @@ def _convert_with_tweaks(
         shutil.copyfile(subtitle_file, sub_path)
 
     has_audio = _has_audio(source)
+    channels = _audio_channels(source) if tweaks.spatial else None
     if not has_audio and not mute and tweaks.changes_sound and not tweaks.replace_audio:
         raise ConversionError("This file has no sound, so the sound tweaks cannot be applied.")
 
@@ -336,6 +343,7 @@ def _convert_with_tweaks(
                 bitrate_kbps=bitrate,
                 audio_kbps=audio_kbps,
                 has_audio=has_audio,
+                channels=channels,
                 use_gpu=use_gpu,
             )
         except ValueError as exc:

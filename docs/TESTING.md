@@ -185,6 +185,10 @@ Use a short clip of your own, 20 to 60 seconds, with sound.
 - [ ] Resize to 480p and to 1080p gives the expected height
 - [ ] "Make it smaller than 5 MB" gives a file under 5 MB that still looks fine
 - [ ] Volume 150, a 2 second fade in and fade out are heard; bass boost and virtual surround sound different on headphones
+- [ ] Spatial sound (wired headphones, Windows Sonic and Atmos off): "From the left side" is clearly in the left ear, "From the right side" in the right
+- [ ] "Orbit around your head" moves the sound around you; a smaller number of seconds makes it faster
+- [ ] "Travel front to back" and "From behind" sound different from "From the front"
+- [ ] "Movie-style surround" on a 5.1 film clip keeps dialogue in front and effects around you
 - [ ] Replace the sound with another audio file; the video plays the new sound
 - [ ] A .srt file added as a track can be switched on in VLC; burned in is always visible
 - [ ] GIF and animated WebP of a 5 second clip play in the browser

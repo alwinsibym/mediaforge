@@ -32,6 +32,7 @@ Thumbs.db
 # Environment
 .env
 data/
+!backend/app/data/
 cookies*.txt
 *.cookies
 sites.txt
