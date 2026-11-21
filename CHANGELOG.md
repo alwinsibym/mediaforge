@@ -6,6 +6,12 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [Unreleased]
+
+### Fixed
+
+- Phone layout: the header no longer overflows on screens under 400 px, nothing can make the page wider than the screen, tabs and dialog buttons fit small screens, and tap targets are larger on touch devices.
+
 ## [1.0.0]
 
 The first stable release: the project is feature complete. It adds speed, a way to check a result before converting, and a finished look.
