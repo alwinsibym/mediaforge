@@ -4,19 +4,7 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
-
-### Changed
-
-- The header is see-through at the top of the page and turns to frosted glass once you scroll; its links stay clearly readable.
-- The Preview button is now as tall as the link box and touches its edge.
-- Settings and History scroll without a visible scrollbar.
-- After the shutdown animation the screen is pure black, with no page colour or glow left.
-- The frosted-glass background glow drifts slowly (not with reduced motion turned on).
-
-### Changed
-
-- Glass look: a soft coloured glow behind the page, frosted translucent cards, header, footer and dialogs with a light edge, rounder corners and a gradient on the main button, in Light and Dark. Solid cards are used instead where the browser has no frosted glass or the system asks for reduced transparency.
+## [1.2.0] - 2026-11-21
 
 ### Added
 
@@ -24,7 +12,13 @@ All notable changes to MediaForge are listed here. The format follows
 
 ### Changed
 
-- Fluid layout: type, spacing, card padding and corner radius now scale smoothly with the screen width, cards flow into as many columns as fit, the options inside the converter adapt to the converter's own width, panels ease open instead of snapping, and the header never wraps on tablets.
+- Glass look: a soft coloured glow behind the page, frosted translucent cards, header, footer and dialogs with a light edge, rounder corners and a gradient on the main button, in Light and Dark. Solid cards are used instead where the browser has no frosted glass or the system asks for reduced transparency.
+- Fluid layout: type, spacing, card padding and corner radius scale smoothly with the screen width, cards flow into as many columns as fit, the options inside the converter adapt to the converter's own width, panels ease open instead of snapping, and the header never wraps on tablets.
+- The header is see-through at the top of the page and turns to frosted glass once you scroll; its links stay clearly readable.
+- The Preview button is as tall as the link box and touches its edge.
+- Settings and History scroll without a visible scrollbar.
+- After the shutdown animation the screen is pure black, with no page colour or glow left.
+- The frosted-glass background glow drifts slowly (not with reduced motion turned on).
 
 ## [1.1.0] - 2026-11-21
 
