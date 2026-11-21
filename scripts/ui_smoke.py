@@ -30,6 +30,7 @@ os.environ["MEDIAFORGE_DATA_DIR"] = str(_TMP / "data")
 import uvicorn  # noqa: E402
 
 from app import config, downloader, jobs, main, transcoder  # noqa: E402
+from app import tweaks as tweaks_module  # noqa: E402
 from app.downloader import ConversionError  # noqa: E402
 
 THUMB = (
@@ -126,6 +127,15 @@ def _start_server() -> int:
     downloader.download_thumbnail = lambda *a, **k: None
     transcoder.convert_file = _fake_convert
     transcoder.make_sample = _fake_sample
+    # The page is tested, not this computer's FFmpeg: offer every spatial preset.
+    _real_caps = tweaks_module.capabilities
+
+    def _all_spatial():
+        caps = dict(_real_caps())
+        caps["spatial"] = {name: True for name in tweaks_module.spatial_mod.PRESETS}
+        return caps
+
+    tweaks_module.capabilities = _all_spatial
     transcoder.ffmpeg_available = lambda: True
     jobs.PACE_MIN = jobs.PACE_MAX = 0
     main._upgrade_ytdlp = lambda: {"before": "1", "after": "1", "changed": False}
