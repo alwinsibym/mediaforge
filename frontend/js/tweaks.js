@@ -3,6 +3,7 @@
 import { $, els } from "./dom.js";
 import { setStatus } from "./errors.js";
 import { formatDuration, formatSize } from "./format.js";
+import { showSampleBox } from "./sample.js";
 import { state } from "./state.js";
 
 const t = {
@@ -90,6 +91,7 @@ export function updateTweaks() {
   t.audioFile.disabled = els.optMute.checked;
   t.subsMode.hidden = !t.subsFile.files.length;
   t.infoBtn.disabled = !els.fileInput.files.length;
+  showSampleBox(state.mode === "file" && !preset, els.fileInput.files.length > 0);
   const note = animated ? "The result is a picture without sound, so the format above is ignored." : "";
   t.note.textContent = note;
   t.note.hidden = !note;

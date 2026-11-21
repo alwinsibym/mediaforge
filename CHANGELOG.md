@@ -7,6 +7,14 @@ All notable changes to MediaForge are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- "Use my graphics card" in Settings: H.264 and H.265 encoding on NVIDIA cards (NVENC), tested by encoding one frame, with automatic fallback to the processor. `POST /api/gpu/test` tests again.
+- "Try a 10-second sample" on the File tab: converts ten seconds with the chosen settings, plays it, and estimates the size and time of the whole file. `POST /api/sample`.
+- `MEDIAFORGE_MAX_DURATION` and `MEDIAFORGE_MAX_UPLOAD_MB` default to no limit (0).
+
+### Changed
+- A smoother, more modern page: things slide in, buttons respond, sections open smoothly, file pickers are pills, and Tweaks is laid out in two columns with grouped cards. Reduced-motion settings are respected.
+
+### Added
 - A cover picture (thumbnail) can be added to uploaded files: MP3, M4A, FLAC, MP4 and MKV.
 
 ### Fixed

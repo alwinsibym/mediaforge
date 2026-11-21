@@ -1,7 +1,7 @@
 /* One link or file as a background job, and the Convert button. */
 
 import { currentQuality, isMuted } from "./catalog.js";
-import { collectTweaks } from "./tweaks.js";
+import { buildFileForm } from "./upload-form.js";
 import { els } from "./dom.js";
 import { problemFrom, setProblem, setStatus } from "./errors.js";
 import { collectOptions } from "./extras.js";
@@ -34,24 +34,12 @@ async function startLinkJob() {
 
 /* Upload with XMLHttpRequest because fetch cannot report upload progress. */
 function startFileJob() {
-  const file = els.fileInput.files[0];
-  if (!file) return Promise.reject(new Error("Choose a file first."));
-  const limitMb = state.catalogue.limits.max_upload_mb;
-  if (limitMb && file.size > limitMb * 1024 * 1024) {
-    return Promise.reject(new Error(`That file is larger than the ${limitMb} MB limit.`));
+  let data;
+  try {
+    data = buildFileForm();
+  } catch (error) {
+    return Promise.reject(error);
   }
-  const data = new FormData();
-  data.append("file", file);
-  data.append("format", state.format);
-  if (currentQuality()) data.append("quality", currentQuality());
-  data.append("mute", String(isMuted()));
-  data.append("normalize", String(els.optNormalize.checked));
-  data.append("title", els.fileTitleInput.value.trim());
-  const tweaks = collectTweaks();
-  if (tweaks.options) data.append("options", tweaks.options);
-  if (tweaks.audio) data.append("audio_file", tweaks.audio);
-  if (tweaks.subtitles) data.append("subtitle_file", tweaks.subtitles);
-  if (tweaks.cover) data.append("cover_file", tweaks.cover);
 
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
