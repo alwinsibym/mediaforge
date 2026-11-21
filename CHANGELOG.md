@@ -8,6 +8,14 @@ All notable changes to MediaForge are listed here. The format follows
 
 ### Changed
 
+- The header is see-through at the top of the page and turns to frosted glass once you scroll; its links stay clearly readable.
+- The Preview button is now as tall as the link box and touches its edge.
+- Settings and History scroll without a visible scrollbar.
+- After the shutdown animation the screen is pure black, with no page colour or glow left.
+- The frosted-glass background glow drifts slowly (not with reduced motion turned on).
+
+### Changed
+
 - Glass look: a soft coloured glow behind the page, frosted translucent cards, header, footer and dialogs with a light edge, rounder corners and a gradient on the main button, in Light and Dark. Solid cards are used instead where the browser has no frosted glass or the system asks for reduced transparency.
 
 ### Added

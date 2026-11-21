@@ -7,6 +7,7 @@ import { updateExtras } from "./extras.js";
 import { markSampleStale, wireSample } from "./sample.js";
 import { wireTweaks } from "./tweaks.js";
 import { setupDropzone } from "./files.js";
+import { wireHeader } from "./header.js";
 import { hideSplash } from "./splash.js";
 import { clearHistory, openHistory } from "./history.js";
 import { loadPlaylist, updateFolderHint, updatePlaylistSelection } from "./playlist.js";
@@ -19,6 +20,8 @@ import { cancelSingleJob, onSubmit } from "./single-job.js";
 import { state } from "./state.js";
 import { onTabKeys, selectTab } from "./tabs.js";
 import { applyTheme, chooseTheme, savedTheme } from "./theme.js";
+
+wireHeader();
 
 async function startUp() {
   await ensureLoggedIn();

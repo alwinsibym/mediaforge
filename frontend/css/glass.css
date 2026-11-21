@@ -27,24 +27,56 @@
   --glow-c: rgba(14, 165, 233, 0.2);
 }
 
-/* The glow sits behind everything and never moves, so it costs nothing while scrolling. */
-body::before {
+/* Three soft blobs of colour sit behind the page and drift slowly. Only transforms are
+   animated, so the movement runs on the graphics card and costs almost nothing. */
+body::before, body::after, html::before {
   content: "";
   position: fixed;
-  inset: 0;
   z-index: -1;
   pointer-events: none;
-  background:
-    radial-gradient(46rem 34rem at 8% -6%, var(--glow-a), transparent 62%),
-    radial-gradient(40rem 30rem at 98% 6%, var(--glow-b), transparent 60%),
-    radial-gradient(38rem 28rem at 62% 104%, var(--glow-c), transparent 60%);
+  border-radius: 50%;
+  will-change: transform;
+}
+body::before {
+  width: 62vmax; height: 48vmax; left: -14vmax; top: -20vmax;
+  background: radial-gradient(closest-side, var(--glow-a), transparent);
+  animation: drift-a 28s ease-in-out infinite alternate;
+}
+body::after {
+  width: 56vmax; height: 44vmax; right: -16vmax; top: -12vmax;
+  background: radial-gradient(closest-side, var(--glow-b), transparent);
+  animation: drift-b 34s ease-in-out infinite alternate;
+}
+html::before {
+  width: 60vmax; height: 44vmax; left: 34vw; bottom: -24vmax;
+  background: radial-gradient(closest-side, var(--glow-c), transparent);
+  animation: drift-c 40s ease-in-out infinite alternate;
+}
+@keyframes drift-a { to { transform: translate3d(14vw, 10vh, 0) scale(1.15); } }
+@keyframes drift-b { to { transform: translate3d(-16vw, 14vh, 0) scale(0.9); } }
+@keyframes drift-c { to { transform: translate3d(-18vw, -12vh, 0) scale(1.12); } }
+@media (prefers-reduced-motion: reduce) {
+  body::before, body::after, html::before { animation: none; }
 }
 
+/* At the top the header is invisible: the page glow shows through. Once you scroll, it turns
+   into frosted glass (header.js adds .is-scrolled). */
 .site-header {
+  background: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+  transition: background-color 0.3s var(--ease), border-color 0.3s var(--ease),
+    backdrop-filter 0.3s var(--ease), box-shadow 0.3s var(--ease);
+}
+.site-header.is-scrolled {
   background: color-mix(in srgb, var(--page) 62%, transparent);
   backdrop-filter: blur(16px) saturate(1.4);
   border-bottom-color: var(--glass-edge);
+  box-shadow: 0 10px 28px -22px rgba(23, 28, 46, 0.55);
 }
+.nav a { color: color-mix(in srgb, var(--text) 78%, transparent); }
+.nav a:hover { color: var(--text); }
+.header-bar .tool-btn, .header-bar .theme-switch { background: var(--glass); backdrop-filter: blur(10px); }
 
 .converter, .steps li, .spec, .sample, .site-footer {
   background: var(--glass);
@@ -83,9 +115,25 @@ body::before {
 /* Where frosted glass is unavailable or unwanted, fall back to solid cards. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .converter, .steps li, .spec, .sample, .site-footer, .dialog { background: var(--surface); }
-  .site-header { background: color-mix(in srgb, var(--page) 94%, transparent); }
+  .site-header.is-scrolled { background: color-mix(in srgb, var(--page) 94%, transparent); }
 }
 @media (prefers-reduced-transparency: reduce) {
   .converter, .steps li, .spec, .sample, .site-footer, .dialog { background: var(--surface); backdrop-filter: none; }
-  .site-header { background: var(--page); backdrop-filter: none; }
+  .site-header.is-scrolled { background: var(--page); backdrop-filter: none; }
+}
+
+/* Settings and History scroll with wheel, touch and keys, without a visible scrollbar. */
+.dialog, .history-list { scrollbar-width: none; -ms-overflow-style: none; }
+.dialog::-webkit-scrollbar, .history-list::-webkit-scrollbar { display: none; }
+
+/* Preview button: as tall as the box and flush with its right edge. */
+.input-bar { padding-right: 0; overflow: hidden; }
+.input-bar #preview-btn {
+  align-self: stretch;
+  height: auto;
+  margin: 0;
+  padding-inline: clamp(18px, 3vw, 28px);
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 0;
 }
