@@ -137,3 +137,51 @@ html::before {
   border-left: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
   border-radius: 0;
 }
+
+/* Playlist: the Load button matches the Preview button. */
+.input-bar #playlist-load {
+  align-self: stretch;
+  height: auto;
+  margin: 0;
+  padding-inline: clamp(18px, 3vw, 28px);
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 0;
+}
+
+/* Audio / Video switch: one pill slides between the two sides. */
+.type-toggle {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  isolation: isolate;
+}
+.type-toggle::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 2);
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 68%, #a855f7));
+  box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+  transform: translateX(0);
+  transition: transform 0.38s cubic-bezier(0.34, 1.35, 0.5, 1);
+}
+.type-toggle:has(input[value="video"]:checked)::before { transform: translateX(100%); }
+.type-toggle .segment span {
+  text-align: center;
+  background: transparent;
+  box-shadow: none;
+  transition: color 0.25s var(--ease);
+}
+.type-toggle .segment input:checked + span {
+  background: transparent;
+  box-shadow: none;
+  color: var(--on-accent, #fff);
+}
+@media (prefers-reduced-motion: reduce) {
+  .type-toggle::before { transition: none; }
+}
