@@ -6,6 +6,10 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Glass look: a soft coloured glow behind the page, frosted translucent cards, header, footer and dialogs with a light edge, rounder corners and a gradient on the main button, in Light and Dark. Solid cards are used instead where the browser has no frosted glass or the system asks for reduced transparency.
+
 ### Added
 
 - A release workflow: pushing a version tag publishes the GitHub release with the changelog section as its notes, and it can be run by hand for older tags.
