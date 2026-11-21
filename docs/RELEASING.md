@@ -8,7 +8,7 @@ MediaForge uses [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 | A new feature that does not break anything | MINOR | 0.2.1 to 0.3.0 |
 | A change that breaks how people use it (renamed settings, removed formats) | MAJOR | 0.3.0 to 1.0.0 |
 
-Below 1.0.0 means "still changing". Move to 1.0.0 when you are happy to call it stable.
+Below 1.0.0 means "still changing". 1.0.0 is the first release the project calls stable and complete; after that, new features are 1.1.0, 1.2.0 and so on, and fixes are 1.0.1.
 "Version 1.1" and "ver 2.0" in everyday speech are the same idea: `1.1.0` and `2.0.0`.
 
 ## Releasing a version
