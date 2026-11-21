@@ -6,9 +6,9 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
-## [5.0.0]
+## [1.0.0]
 
-The project is feature complete. This release adds speed, a way to check a result before converting, and a finished look.
+The first stable release: the project is feature complete. It adds speed, a way to check a result before converting, and a finished look.
 
 ### Added
 - "Use my graphics card" in Settings: H.264 and H.265 encoding on NVIDIA cards (NVENC), tested by encoding one frame, with automatic fallback to the processor. `POST /api/gpu/test` tests again.
