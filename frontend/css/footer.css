@@ -1,0 +1,56 @@
+/* The footer: who it is, where to go, what it is made of. */
+
+.site-footer { margin-top: 24px; background: var(--surface); border-top: 1px solid var(--line); color: var(--muted); }
+.footer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+  gap: 32px 40px;
+  padding-top: 44px;
+  padding-bottom: 36px;
+}
+.footer-brand { display: grid; align-content: start; gap: 14px; }
+.footer-brand .brand { justify-self: start; }
+.footer-brand p { max-width: 34ch; margin: 0; line-height: 1.55; }
+.footer-col { display: grid; align-content: start; gap: 4px; }
+.footer-col h2 { margin: 0 0 8px; color: var(--text); font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; font-stretch: 105%; }
+.footer-col a {
+  justify-self: start;
+  padding: 4px 0;
+  color: var(--muted);
+  text-decoration: none;
+  background: linear-gradient(var(--accent), var(--accent)) left bottom / 0 2px no-repeat;
+  transition: color 0.16s, background-size 0.25s var(--ease);
+}
+.footer-col a:hover, .footer-col a:focus-visible { color: var(--text); background-size: 100% 2px; }
+.footer-col a[href^="http"]::after { content: " \2197"; font-size: 0.8em; opacity: 0.6; }
+
+.footer-base {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding-top: 18px;
+  padding-bottom: 24px;
+  font-size: 0.9rem;
+  background: linear-gradient(var(--line), var(--line)) center top / calc(100% - 40px) 1px no-repeat;
+}
+.footer-base p { margin: 0; }
+.footer-meta { display: flex; align-items: center; gap: 16px; }
+.version-chip { padding: 3px 10px; color: var(--accent); background: var(--accent-soft); border-radius: 999px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.to-top { color: var(--muted); text-decoration: none; }
+.to-top::before { content: "\2191"; display: inline-block; margin-right: 6px; transition: transform 0.2s var(--ease); }
+.to-top:hover { color: var(--text); }
+.to-top:hover::before { transform: translateY(-3px); }
+
+@media (max-width: 860px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; padding-top: 32px; }
+  .footer-brand { grid-column: 1 / -1; }
+}
+@media (max-width: 480px) {
+  .footer-grid { grid-template-columns: 1fr 1fr; gap: 24px; }
+  .footer-meta { width: 100%; justify-content: space-between; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .footer-col a, .to-top::before { transition: none; }
+}

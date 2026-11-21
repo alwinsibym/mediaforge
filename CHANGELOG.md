@@ -6,18 +6,24 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+## [5.0.0]
+
+The project is feature complete. This release adds speed, a way to check a result before converting, and a finished look.
+
 ### Added
 - "Use my graphics card" in Settings: H.264 and H.265 encoding on NVIDIA cards (NVENC), tested by encoding one frame, with automatic fallback to the processor. `POST /api/gpu/test` tests again.
 - "Try a 10-second sample" on the File tab: converts ten seconds with the chosen settings, plays it, and estimates the size and time of the whole file. `POST /api/sample`.
-- `MEDIAFORGE_MAX_DURATION` and `MEDIAFORGE_MAX_UPLOAD_MB` default to no limit (0).
+- A cover picture (thumbnail) can be added to uploaded files: MP3, M4A, FLAC, MP4 and MKV.
+- An opening screen with the animated logo (shown once per session), an animated goodbye when MediaForge is switched off, and a drawn tick with a soft pulse when a download or another action finishes.
+- Three illustrated cards in "How it works", and a new footer with links, the running version and a back-to-top link.
 
 ### Changed
-- A smoother, more modern page: things slide in, buttons respond, sections open smoothly, file pickers are pills, and Tweaks is laid out in two columns with grouped cards. Reduced-motion settings are respected.
-
-### Added
-- A cover picture (thumbnail) can be added to uploaded files: MP3, M4A, FLAC, MP4 and MKV.
+- `MEDIAFORGE_MAX_DURATION` and `MEDIAFORGE_MAX_UPLOAD_MB` default to no limit (0).
+- A smoother, more modern page: things slide in, buttons respond, sections open smoothly, file pickers are pills, and Tweaks is two columns of grouped cards. Reduced-motion settings are respected.
+- New styles live in `frontend/css/` (splash, feedback, illustrations, footer) and new scripts in `frontend/js/` (splash, shutdown, feedback).
 
 ### Fixed
+- Tweaks sound effects, burned-in subtitles and GIF were greyed out on FFmpeg 9, whose filter list has a different layout.
 - The page is re-checked by the browser on every visit (`Cache-Control: no-cache`), so an update is never hidden by a stale cache. This fixed "larger than the 0 MB limit" after the limits were removed.
 
 ## [0.4.0]

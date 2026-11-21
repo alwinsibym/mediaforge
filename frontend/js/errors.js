@@ -1,12 +1,17 @@
 /* Status line and the error card. */
 
 import { els } from "./dom.js";
+import { tickElement } from "./feedback.js";
 
 export function setStatus(message, kind = "", info = null) {
   els.status.className = "status" + (kind ? ` is-${kind}` : "");
   if (info) {
     els.status.replaceChildren(buildErrorCard(info, message));
     els.status.classList.add("has-card");
+  } else if (kind === "success") {
+    const text = document.createElement("span");
+    text.textContent = message;
+    els.status.replaceChildren(tickElement(), text);
   } else {
     els.status.textContent = message;
   }

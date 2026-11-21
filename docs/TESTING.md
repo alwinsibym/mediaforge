@@ -194,3 +194,13 @@ Use a short clip of your own, 20 to 60 seconds, with sound.
 - [ ] Changing a Tweak after a sample greys the sample and says to try again
 - [ ] Cover picture: pick a JPG, convert to MP3 and MP4; the picture shows in Windows Explorer or VLC
 - [ ] Remove hidden details: the file's Properties no longer show the camera, GPS or title
+
+## Look and feel (version 5.0)
+
+- [ ] Opening a new browser tab shows the animated logo for about a second, then the page; reloading in the same tab skips it
+- [ ] The power button in the header: confirm, the page dims, "Shutting down...", then "MediaForge has stopped", then the screen closes to black
+- [ ] A finished download shows a green tick that draws itself, with one soft pulse around the card
+- [ ] Settings saved shows the same tick
+- [ ] The three How it works cards show pictures in light and dark themes, and on a phone
+- [ ] The footer links open (source, what is new, report a problem, licence) and shows the version, v5.0.0
+- [ ] With "Reduce motion" turned on in Windows, nothing floats or slides
