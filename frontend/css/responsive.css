@@ -1,0 +1,50 @@
+/* Phone and small-tablet layout. Loaded last so it can tighten anything above. */
+
+/* Nothing may push the page wider than the screen. */
+html, body { max-width: 100%; overflow-x: clip; }
+img, svg, video, canvas { max-width: 100%; }
+.wrap, main, section, form, fieldset, .converter, .panel,
+.choices > *, .preview > *, .info-row > *, .spec-cell, .steps > *,
+.header-bar > * { min-width: 0; }
+fieldset { min-inline-size: 0; }
+h1, h2, h3, p, li, label, .hint, .file-name { overflow-wrap: anywhere; }
+.table-wrap { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+dialog { max-width: calc(100vw - 24px); }
+
+/* Header: keep brand, theme switch and the three tools on one line. */
+@media (max-width: 560px) {
+  .header-bar { gap: 4px; }
+  .brand { flex: 0 1 auto; min-width: 0; }
+  .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-switch { flex: none; }
+  .theme-switch button { width: 28px; }
+  .tool-btn { width: 32px; height: 32px; }
+  .tool-btn svg { width: 18px; height: 18px; }
+}
+
+/* Very narrow phones: the icon alone is the brand. */
+@media (max-width: 400px) {
+  .brand span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .header-bar { gap: 6px; }
+}
+
+@media (max-width: 480px) {
+  .wrap { padding-left: 14px; padding-right: 14px; }
+  .converter { padding: 14px; }
+  .source-tabs, [role="tablist"] { display: flex; width: 100%; }
+  .source-tab { flex: 1 1 0; min-width: 0; padding-left: 8px; padding-right: 8px; }
+  .dialog-actions { flex-wrap: wrap; }
+  .dialog-actions .btn { flex: 1 1 100%; width: 100%; }
+  .footer-grid, .site-footer .cols { grid-template-columns: 1fr 1fr; }
+}
+
+/* Touch targets: at least 40px high for anything you tap. */
+@media (pointer: coarse) {
+  .btn, .source-tab, .chip, select, input, summary { min-height: 44px; }
+}
+
+/* Short landscape phones: don't let the sticky header eat the screen. */
+@media (max-height: 480px) and (orientation: landscape) {
+  .header-bar { height: 52px; }
+  .hero { padding-top: 24px; padding-bottom: 32px; }
+}
