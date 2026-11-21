@@ -4,6 +4,17 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [1.3.0] - 2026-11-22
+
+### Added
+
+- A step-by-step Windows install and first-use guide with annotated screenshots (`docs/INSTALL.md`), and `scripts/make_guide_images.py` to remake the screenshots from made-up data.
+
+### Changed
+
+- The Audio / Video choice is a switch: one pill slides smoothly between the two sides.
+- The Load playlist button is as tall as its box and touches the edge, like the Preview button.
+
 ## [1.2.0] - 2026-11-21
 
 ### Added
