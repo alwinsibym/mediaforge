@@ -30,7 +30,6 @@ dialog { max-width: calc(100vw - 24px); }
 
 @media (max-width: 480px) {
   .wrap { padding-left: 14px; padding-right: 14px; }
-  .converter { padding: 14px; }
   .source-tabs, [role="tablist"] { display: flex; width: 100%; }
   .source-tab { flex: 1 1 0; min-width: 0; padding-left: 8px; padding-right: 8px; }
   .dialog-actions { flex-wrap: wrap; }

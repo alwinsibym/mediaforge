@@ -4,6 +4,12 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+
+### Changed
+
+- Fluid layout: type, spacing, card padding and corner radius now scale smoothly with the screen width, cards flow into as many columns as fit, the options inside the converter adapt to the converter's own width, panels ease open instead of snapping, and the header never wraps on tablets.
+
 ## [1.1.0] - 2026-11-21
 
 ### Added
