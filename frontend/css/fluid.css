@@ -1,0 +1,71 @@
+/* Fluid layout: sizes and spacing follow the screen width smoothly instead of jumping at set
+   widths. Loaded after style.css, before responsive.css (which only adds safety rules). */
+
+:root {
+  --gutter: clamp(14px, 3.2vw, 32px);
+  --space-block: clamp(32px, 5.5vw, 72px);
+  --space-card: clamp(14px, 2.6vw, 30px);
+  --radius-card: clamp(16px, 2.2vw, 24px);
+  --page-width: 1040px;
+}
+
+body { font-size: clamp(0.97rem, 0.92rem + 0.25vw, 1.06rem); }
+
+.wrap { max-width: var(--page-width); padding-inline: var(--gutter); }
+
+.hero { padding-block: clamp(32px, 6vw, 72px) var(--space-block); }
+.hero h1 { max-width: 22ch; }
+.lead { font-size: clamp(1rem, 0.94rem + 0.5vw, 1.2rem); }
+
+.converter {
+  margin-top: clamp(22px, 3.4vw, 40px);
+  padding: var(--space-card);
+  border-radius: var(--radius-card);
+  container: converter / inline-size;
+}
+
+.section { padding-bottom: var(--space-block); }
+.section h2 { font-size: clamp(1.45rem, 1.1rem + 1.7vw, 2.2rem); }
+
+/* Cards flow into as many columns as fit, so there is no fixed phone/tablet/desktop switch. */
+.steps {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
+  gap: clamp(14px, 2vw, 24px);
+}
+.steps li { padding: clamp(16px, 2vw, 24px); border-radius: clamp(14px, 1.8vw, 20px); }
+
+/* The options inside the converter follow the width of the converter itself. */
+@container converter (max-width: 34rem) {
+  .choices { grid-template-columns: 1fr; }
+  .group-formats { grid-column: 1; grid-row: auto; }
+  .group-quality { grid-row: auto; max-width: none; }
+}
+@container converter (min-width: 52rem) {
+  .choices { column-gap: clamp(28px, 4cqi, 48px); }
+}
+
+/* Panels that open (FAQ, Tweaks, More options) ease open instead of snapping. */
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    transition: block-size 0.28s var(--ease), content-visibility 0.28s allow-discrete;
+  }
+  details[open]::details-content { block-size: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  details::details-content { transition: none; }
+}
+
+/* Wide screens: a little more breathing room, same reading width for text. */
+@media (min-width: 1500px) {
+  :root { --page-width: 1120px; }
+}
+
+/* Header links never wrap; on tablets the extra link makes room. */
+.nav a { white-space: nowrap; }
+@media (max-width: 860px) {
+  .nav-extra { display: none; }
+  .nav a { padding-inline: 9px; }
+}
