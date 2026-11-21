@@ -4,13 +4,11 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [1.1.0] - 2026-11-21
 
 ### Added
 
-- Spatial sound (headphones): orbit around your head (8D) with a speed you choose, travel front to back, sound from the front, behind, left, right or above, speakers in a room, and movie-style surround that keeps a 5.1 mix's front, side and rear sound. Uses a bundled MIT KEMAR head model through FFmpeg's `sofalizer`.
-
-## [Unreleased]
+- Spatial sound (headphones), under Tweaks on the File tab: orbit around your head (8D) with a speed you choose, travel front to back, sound from the front, behind, left, right or above, speakers in a room, and movie-style surround that keeps a 5.1 mix's front, side and rear sound. Uses a bundled MIT KEMAR head model through FFmpeg's `sofalizer`; the orbit falls back to a left-right sweep if the filter is missing.
 
 ### Fixed
 
