@@ -21,6 +21,10 @@ const t = {
   fadeIn: $("tw-fade-in"),
   fadeOut: $("tw-fade-out"),
   effect: $("tw-effect"),
+  spatial: $("tw-spatial"),
+  spatialHint: $("tw-spatial-hint"),
+  spatialSpeedField: $("tw-spatial-speed-field"),
+  spatialSpeed: $("tw-spatial-speed"),
   audioField: $("tw-audio-field"),
   audioFile: $("tw-audio-file"),
   coverField: $("tw-cover-field"),
@@ -55,6 +59,10 @@ export function setupTweaks() {
   fill(t.resize, tweaks.resize_heights.map((h) => [String(h), RESIZE_LABELS[h] || `${h}p`]));
   fill(t.effect, tweaks.effects.map((e) => [e.id, caps.effects[e.id] ? e.label : `${e.label} - not available here`]));
   [...t.effect.options].forEach((o) => { if (o.text.endsWith("not available here")) o.disabled = true; });
+  fill(t.spatial, tweaks.spatial.map((p) => [p.id, caps.spatial?.[p.id] ? p.label : `${p.label} - not available here`]));
+  [...t.spatial.options].forEach((o) => { if (o.text.endsWith("not available here")) o.disabled = true; });
+  if (tweaks.spatial_seconds) t.spatialSpeed.value = String(tweaks.spatial_seconds.default);
+  t.spatial.addEventListener("change", updateTweaks);
   fill(t.width, tweaks.animated_widths.map((w) => [String(w), `${w} px wide`]));
   t.width.value = "480";
   if (!caps.animated.gif) t.animated.querySelector('[value="gif"]').disabled = true;
@@ -84,6 +92,10 @@ export function updateTweaks() {
   t.subsGroup.hidden = !video || animated;
   const coverFormats = state.catalogue?.tweaks?.cover_formats || [];
   t.coverField.hidden = animated || !coverFormats.includes(state.format);
+  const chosen = (state.catalogue?.tweaks?.spatial || []).find((p) => p.id === t.spatial.value);
+  t.spatialHint.textContent = chosen ? chosen.hint : "";
+  t.spatialHint.hidden = !chosen;
+  t.spatialSpeedField.hidden = !chosen?.speed;
   t.animatedGroup.hidden = !video;
   t.widthField.hidden = !animated;
   t.sound.hidden = animated;
@@ -120,6 +132,8 @@ export function collectTweaks() {
     add("fade_in", numberOrEmpty(t.fadeIn));
     add("fade_out", numberOrEmpty(t.fadeOut));
     add("effect", t.effect.value);
+    add("spatial", t.spatial.value);
+    if (!t.spatialSpeedField.hidden) add("spatial_seconds", numberOrEmpty(t.spatialSpeed));
   }
   add("start", numberOrEmpty(t.start));
   add("end", numberOrEmpty(t.end));

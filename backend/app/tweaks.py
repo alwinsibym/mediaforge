@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from . import ffmpeg_locator, formats, gpu
+from . import spatial as spatial_mod
 from .features import parse_timestamp
 
 RESIZE_HEIGHTS = (360, 480, 720, 1080, 1440, 2160)
@@ -67,6 +68,8 @@ _TWEAK_KEYS = (
     "fade_in",
     "fade_out",
     "effect",
+    "spatial",
+    "spatial_seconds",
     "target_mb",
     "strip_metadata",
     "subtitles",
@@ -88,6 +91,8 @@ class Tweaks:
     fade_in: float = 0.0  # seconds
     fade_out: float = 0.0
     effect: str = ""
+    spatial: str = ""  # a preset from spatial_mod.PRESETS
+    spatial_seconds: float = spatial_mod.DEFAULT_SECONDS  # one turn of an orbit or sweep
     target_mb: float | None = None  # compress to at most this many megabytes
     strip_metadata: bool = False
     subtitles: str = ""  # "", "soft" (a selectable track) or "burn" (drawn on the picture)
@@ -116,7 +121,12 @@ class Tweaks:
     @property
     def changes_sound(self) -> bool:
         return bool(
-            self.volume != 100 or self.fade_in or self.fade_out or self.effect or self.replace_audio
+            self.volume != 100
+            or self.fade_in
+            or self.fade_out
+            or self.effect
+            or self.spatial
+            or self.replace_audio
         )
 
     @property
@@ -185,6 +195,23 @@ def parse(
     if effect and effect not in EFFECTS:
         raise ValueError(f"Unknown sound effect '{effect}'.")
 
+    sp = str(data.get("spatial") or "")
+    if sp and sp not in spatial_mod.PRESETS:
+        raise ValueError(f"Unknown spatial sound '{sp}'.")
+    if sp and not spatial_mod.sofa_available() and sp != "orbit":
+        raise ValueError("The head model file for spatial sound is missing from this install.")
+    sp_seconds = _number(
+        data,
+        "spatial_seconds",
+        spatial_mod.MIN_SECONDS,
+        spatial_mod.MAX_SECONDS,
+        "Seconds per turn",
+    )
+    if sp_seconds is not None and not (sp and spatial_mod.PRESETS[sp].get("speed")):
+        sp_seconds = None
+    if sp and animated:
+        raise ValueError("A GIF or WebP has no sound, so spatial sound cannot be added.")
+
     target = _number(data, "target_mb", MIN_TARGET_MB, MAX_TARGET_MB, "Target size")
     if target is not None and (animated or formats.is_preset(fmt) or fmt in formats.LOSSLESS_AUDIO):
         raise ValueError(
@@ -237,6 +264,8 @@ def parse(
         fade_in=fade_in,
         fade_out=fade_out,
         effect=effect,
+        spatial=sp,
+        spatial_seconds=sp_seconds if sp_seconds is not None else spatial_mod.DEFAULT_SECONDS,
         target_mb=target,
         strip_metadata=strip,
         subtitles=mode,
@@ -291,6 +320,8 @@ def capabilities() -> dict:
         return {
             "video_codecs": {name: False for name in VIDEO_CODECS},
             "effects": {name: False for name in EFFECTS},
+            "spatial": {name: False for name in spatial_mod.PRESETS},
+            "spatial_hrtf": False,
             "subtitles_burn": False,
             "animated": {"gif": False, "webp": False},
         }
@@ -310,6 +341,8 @@ def capabilities() -> dict:
         "effects": {
             name: unknown_filters or flt in filters for name, flt in _EFFECT_FILTERS.items()
         },
+        "spatial": spatial_mod.availability(filters),
+        "spatial_hrtf": spatial_mod.has_hrtf(filters),
         "subtitles_burn": unknown_filters or "subtitles" in filters,
         "animated": {
             "gif": unknown_filters or ("palettegen" in filters and "paletteuse" in filters),
@@ -332,6 +365,20 @@ def describe() -> dict:
             for k, v in VIDEO_CODECS.items()
         ],
         "effects": [{"id": k, "label": v[0]} for k, v in EFFECTS.items()],
+        "spatial": [
+            {
+                "id": k,
+                "label": v["label"],
+                "hint": v["hint"],
+                "speed": bool(v.get("speed")),
+            }
+            for k, v in spatial_mod.PRESETS.items()
+        ],
+        "spatial_seconds": {
+            "min": spatial_mod.MIN_SECONDS,
+            "max": spatial_mod.MAX_SECONDS,
+            "default": spatial_mod.DEFAULT_SECONDS,
+        },
         "animated_widths": list(ANIMATED_WIDTHS),
         "animated_max_seconds": ANIMATED_MAX_SECONDS,
         "subtitle_extensions": sorted(SUBTITLE_EXTENSIONS),
@@ -371,11 +418,18 @@ def effective_duration(duration: float | None, tweaks: Tweaks) -> float | None:
     return max(0.0, end - (tweaks.start or 0))
 
 
-def audio_filters(tweaks: Tweaks, normalize: bool, duration: float | None) -> list[str]:
+def audio_filters(
+    tweaks: Tweaks, normalize: bool, duration: float | None, channels: str | None = None
+) -> list[str]:
     """Audio filters in the order they should run: effect, volume, loudness, then fades."""
     chain: list[str] = []
     if tweaks.effect:
         chain.append(EFFECTS[tweaks.effect][1])
+    if tweaks.spatial:
+        hrtf = capabilities().get("spatial_hrtf", True)
+        chain.append(
+            spatial_mod.filter_graph(tweaks.spatial, tweaks.spatial_seconds, channels, hrtf)
+        )
     if tweaks.volume != 100:
         chain.append(f"volume={tweaks.volume / 100:g}")
     if normalize:
@@ -492,6 +546,7 @@ def build_command(
     audio_kbps: int | None = None,
     has_audio: bool = True,
     use_gpu: bool = False,
+    channels: str | None = None,
 ) -> list[str]:
     """The FFmpeg arguments for one conversion with tweaks.
 
@@ -544,7 +599,7 @@ def build_command(
         command.append(str(target))
         return command
 
-    chain = audio_filters(tweaks, normalize and not mute, out_len)
+    chain = audio_filters(tweaks, normalize and not mute, out_len, channels)
     is_audio_out = formats.is_audio(fmt)
 
     if is_audio_out:

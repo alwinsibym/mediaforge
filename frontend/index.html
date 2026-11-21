@@ -243,6 +243,11 @@
               </div>
               <div class="mini-field"><label for="tw-effect">Sound effect</label>
                 <select id="tw-effect"><option value="">None</option></select></div>
+              <div class="mini-field"><label for="tw-spatial">Spatial sound (use headphones)</label>
+                <select id="tw-spatial"><option value="">None</option></select>
+                <p class="hint" id="tw-spatial-hint" hidden></p></div>
+              <div class="mini-field" id="tw-spatial-speed-field" hidden><label for="tw-spatial-speed">Seconds for one full turn</label>
+                <input id="tw-spatial-speed" type="text" inputmode="decimal" value="8" maxlength="4" autocomplete="off"></div>
               <div class="mini-field" id="tw-audio-field"><label for="tw-audio-file">Replace the sound with</label>
                 <input id="tw-audio-file" type="file" accept="audio/*"></div>
             </fieldset>

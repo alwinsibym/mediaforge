@@ -6,6 +6,10 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Spatial sound (headphones): orbit around your head (8D) with a speed you choose, travel front to back, sound from the front, behind, left, right or above, speakers in a room, and movie-style surround that keeps a 5.1 mix's front, side and rear sound. Uses a bundled MIT KEMAR head model through FFmpeg's `sofalizer`.
+
 ## [Unreleased]
 
 ### Fixed
