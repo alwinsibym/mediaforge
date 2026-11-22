@@ -10,7 +10,7 @@ Key facts:
 - Not a hosted service. It is meant to run locally. Users are responsible for having the right to download and convert the content they use.
 
 ## Pages
-- [Website](https://mediaforge.vercel.app/): overview, promo video, supported formats, install options, FAQ.
+- [Website](https://mediaforge-zeta.vercel.app/): overview, promo video, supported formats, install options, FAQ.
 - [Download the Windows app](https://github.com/alwinsibym/mediaforge/releases/latest): latest release with MediaForge-<version>-windows.zip.
 - [Source code and README](https://github.com/alwinsibym/mediaforge): full feature list, settings, API and troubleshooting.
 - [Install guide](https://github.com/alwinsibym/mediaforge/blob/main/docs/INSTALL.md): step-by-step with pictures.

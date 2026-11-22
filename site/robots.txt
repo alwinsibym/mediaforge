@@ -24,4 +24,4 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-Sitemap: https://mediaforge.vercel.app/sitemap.xml
+Sitemap: https://mediaforge-zeta.vercel.app/sitemap.xml

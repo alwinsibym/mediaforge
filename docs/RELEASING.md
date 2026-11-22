@@ -33,7 +33,7 @@ The running app shows its version at `/api/health`.
 
 ## The website
 
-The website in `site/` is hosted on Vercel at https://mediaforge.vercel.app/ and is published automatically whenever `site/` changes on `main` (Vercel project settings: Root Directory `site`, Framework Preset Other, no build command). Its Download button asks GitHub for the newest release and links to that Windows zip, so a new release needs no change to the site. To rebuild the promo video, the share image or the screenshots after the app's look changes, run `python scripts/make_promo.py` and `python scripts/make_guide_images.py --site`, then commit the files in `site/`. Keep the address in `site/index.html`, `robots.txt`, `sitemap.xml`, `llms.txt` and `scripts/promo/end.html` the same if the site ever moves.
+The website in `site/` is hosted on Vercel at https://mediaforge-zeta.vercel.app/ and is published automatically whenever `site/` changes on `main` (Vercel project settings: Root Directory `site`, Framework Preset Other, no build command). Its Download button asks GitHub for the newest release and links to that Windows zip, so a new release needs no change to the site. To rebuild the promo video, the share image or the screenshots after the app's look changes, run `python scripts/make_promo.py` and `python scripts/make_guide_images.py --site`, then commit the files in `site/`. Keep the address in `site/index.html`, `robots.txt`, `sitemap.xml`, `llms.txt` and `scripts/promo/end.html` the same if the site ever moves.
 
 ## Branches
 

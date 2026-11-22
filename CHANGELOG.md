@@ -8,7 +8,7 @@ All notable changes to MediaForge are listed here. The format follows
 
 ### Added
 
-- A project website in `site/`, hosted on Vercel at https://mediaforge.vercel.app/: overview, a 36-second promo video, features, supported formats, spatial sound, phone support, how it works, install options and an FAQ, in the app's own theme. Its Download for Windows button always points at the newest release.
+- A project website in `site/`, hosted on Vercel at https://mediaforge-zeta.vercel.app/: overview, a 36-second promo video, features, supported formats, spatial sound, phone support, how it works, install options and an FAQ, in the app's own theme. Its Download for Windows button always points at the newest release.
 - Search and AI readability for the website: page title, description, canonical address and share image; structured data (software, video and FAQ); `robots.txt`, `sitemap.xml` and `llms.txt`; a 404 page; and caching and security headers in `site/vercel.json`.
 - `scripts/make_promo.py` rebuilds the promo video and share image from the real page with made-up data, and `scripts/make_guide_images.py --site` makes the clean screenshots the website uses.
 - `backend/tests/test_site.py` checks that the website's files, links, structured data and addresses are consistent.
