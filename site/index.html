@@ -3,18 +3,135 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MediaForge: a media converter that runs on your own computer</title>
-  <meta name="description" content="MediaForge converts a video link or a local file to MP3, M4A, FLAC, MP4, WebM and more. Free, open source, and it runs on your own computer. Download for Windows.">
+  <title>MediaForge: free local video and audio converter</title>
+  <meta name="description" content="Convert a video link or file to MP3, MP4, FLAC and more. Free, open source, runs on your own computer with yt-dlp and FFmpeg. Windows app, no sign-up.">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="author" content="Alwin">
   <meta name="theme-color" content="#2d45e6">
+  <link rel="canonical" href="https://mediaforge.vercel.app/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="MediaForge">
-  <meta property="og:description" content="A free, open-source media converter that runs on your own computer.">
-  <meta property="og:image" content="https://alwinsibym.github.io/mediaforge/media/poster.jpg">
-  <meta property="og:url" content="https://alwinsibym.github.io/mediaforge/">
+  <meta property="og:site_name" content="MediaForge">
+  <meta property="og:locale" content="en">
+  <meta property="og:title" content="MediaForge: free local video and audio converter">
+  <meta property="og:description" content="Paste a link or choose a file, pick a format, and download it. Free, open source, and it runs on your own computer.">
+  <meta property="og:url" content="https://mediaforge.vercel.app/">
+  <meta property="og:image" content="https://mediaforge.vercel.app/media/og.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="MediaForge logo with the line: Convert any video link or file. On your own computer.">
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MediaForge: free local video and audio converter">
+  <meta name="twitter:description" content="Free, open source, runs on your own computer. MP3, MP4, FLAC and more.">
+  <meta name="twitter:image" content="https://mediaforge.vercel.app/media/og.jpg">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preload" href="fonts/archivo-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="media/poster.jpg" as="image">
   <link rel="stylesheet" href="style.css">
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "MediaForge",
+  "url": "https://mediaforge.vercel.app/",
+  "description": "A free, open-source media converter that runs on your own computer. Paste a video link or choose a file, pick a format such as MP3, M4A, FLAC, MP4 or WebM, and download the result.",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "Windows 10, Windows 11, macOS, Linux",
+  "isAccessibleForFree": true,
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "downloadUrl": "https://github.com/alwinsibym/mediaforge/releases/latest",
+  "license": "https://opensource.org/license/mit",
+  "image": "https://mediaforge.vercel.app/media/og.jpg",
+  "sameAs": [
+    "https://github.com/alwinsibym/mediaforge"
+  ],
+  "author": {
+    "@type": "Person",
+    "name": "Alwin",
+    "url": "https://github.com/alwinsibym"
+  },
+  "featureList": [
+    "Convert a video link or a local file",
+    "MP3, M4A, AAC, WAV, FLAC, OGG, Opus, MP4, WebM and MKV output",
+    "Playlist downloads with tags and cover art",
+    "Volume, trim, subtitle, chapter and file-size tweaks",
+    "Spatial sound for headphones",
+    "Runs locally with no account"
+  ]
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "VideoObject",
+  "name": "MediaForge tour",
+  "description": "A short tour of MediaForge: paste a link, choose a format, convert, use the spatial sound tweak, and open it on a phone. All data shown is made up.",
+  "thumbnailUrl": "https://mediaforge.vercel.app/media/poster.jpg",
+  "uploadDate": "2026-11-22",
+  "duration": "PT36S",
+  "contentUrl": "https://mediaforge.vercel.app/media/promo.mp4",
+  "embedUrl": "https://mediaforge.vercel.app/"
+}
+  </script>
+  <script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Is it really free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. MediaForge is released under the MIT licence and uses only free, open-source tools: FastAPI, yt-dlp and FFmpeg. There are no accounts, API keys or paid tiers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does anything leave my computer?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The server runs locally and your files stay on your machine. The only network traffic is the download of the link you ask for, and the optional yt-dlp update you start yourself."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which sites work?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Any site yt-dlp supports. Sites that need a sign-in, such as age-restricted videos, can use the sign-in of a browser on your computer, chosen in Settings."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is it legal to use?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Use it for content you own, content under a licence that permits copying (for example Creative Commons), or other material you have the right to download. Many sites restrict downloading in their terms of service, and copyright law applies. You are responsible for how you use it. MediaForge is built to run locally and is not meant to be hosted as a public conversion service."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does Windows warn me when I open the app?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The program is not code-signed, so Windows SmartScreen shows a warning for software it has not seen before. Choose More info, then Run anyway. The source code and the build workflow are public if you want to check them."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "A download fails. What now?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Sites change often. Open Settings and choose Update yt-dlp, then try again. Each error shows a code and a suggested fix, and you can report a problem on the issues page."
+      }
+    }
+  ]
+}
+  </script>
   <script>
     /* Apply a saved theme before the page paints, so it does not flash. */
     try {
@@ -40,6 +157,7 @@
       </a>
       <nav class="nav" aria-label="Page sections">
         <a href="#features">Features</a>
+        <a href="#formats">Formats</a>
         <a href="#how">How it works</a>
         <a href="#start">Get started</a>
         <a href="#faq">FAQ</a>
@@ -79,7 +197,7 @@
       <figure class="stage">
         <div class="window">
           <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
-          <video id="promo" controls preload="metadata" playsinline poster="media/poster.jpg" aria-label="MediaForge promo video, about 36 seconds">
+          <video id="promo" width="1280" height="720" controls preload="metadata" playsinline poster="media/poster.jpg" aria-label="MediaForge promo video, about 36 seconds">
             <source src="media/promo.mp4" type="video/mp4">
             <a href="media/promo.mp4">Watch the promo video</a>
           </video>
@@ -97,7 +215,7 @@
         </article>
         <article>
           <h3>Ten output formats</h3>
-          <p>MP3, M4A, AAC, WAV, FLAC, OGG and Opus for audio. MP4, WebM and MKV for video, with a resolution limit up to 1080p or the best available.</p>
+          <p>MP3, M4A, AAC, WAV, FLAC, OGG and Opus for audio. MP4, WebM and MKV for video, at any quality the video offers, including 1440p and 4K. Nothing is upscaled.</p>
         </article>
         <article>
           <h3>Whole playlists</h3>
@@ -115,6 +233,25 @@
           <h3>Private by design</h3>
           <p>Nothing is uploaded to a conversion service. Links to private network addresses are blocked, and temporary files are deleted after each download.</p>
         </article>
+      </div>
+    </section>
+
+    <section class="section wrap" id="formats">
+      <h2>Supported formats</h2>
+      <p class="sub">Every format is made by FFmpeg on your computer. Lossy audio formats let you choose a bitrate, and the page shows the codec and a typical file size before you start.</p>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr">Output formats and what each is good for</caption>
+          <thead><tr><th scope="col">Format</th><th scope="col">Type</th><th scope="col">Good for</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">MP3</th><td>Audio, lossy</td><td>Plays everywhere: phones, cars, older players.</td></tr>
+            <tr><th scope="row">M4A and AAC</th><td>Audio, lossy</td><td>Good quality at small sizes. Common on Apple devices.</td></tr>
+            <tr><th scope="row">Opus and OGG Vorbis</th><td>Audio, lossy</td><td>The best quality for the size. Open formats.</td></tr>
+            <tr><th scope="row">FLAC and WAV</th><td>Audio, lossless</td><td>Archiving and editing. Large files.</td></tr>
+            <tr><th scope="row">MP4 (H.264)</th><td>Video</td><td>The most compatible video format.</td></tr>
+            <tr><th scope="row">WebM (VP9) and MKV</th><td>Video</td><td>High resolutions such as 1440p and 4K, and files with chapters and several audio tracks.</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
 

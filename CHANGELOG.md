@@ -4,11 +4,18 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
+## [1.5.0] - 2026-11-22
 
 ### Added
 
-- A project website in `site/`, published with GitHub Pages: overview, a short promo video, features, how it works, install options and a Download for Windows button that always points at the newest release. `scripts/make_promo.py` rebuilds the video from the real page with made-up data, and `scripts/make_guide_images.py --site` makes the clean screenshots it uses.
+- A project website in `site/`, hosted on Vercel at https://mediaforge.vercel.app/: overview, a 36-second promo video, features, supported formats, spatial sound, phone support, how it works, install options and an FAQ, in the app's own theme. Its Download for Windows button always points at the newest release.
+- Search and AI readability for the website: page title, description, canonical address and share image; structured data (software, video and FAQ); `robots.txt`, `sitemap.xml` and `llms.txt`; a 404 page; and caching and security headers in `site/vercel.json`.
+- `scripts/make_promo.py` rebuilds the promo video and share image from the real page with made-up data, and `scripts/make_guide_images.py --site` makes the clean screenshots the website uses.
+- `backend/tests/test_site.py` checks that the website's files, links, structured data and addresses are consistent.
+
+### Changed
+
+- The app itself is unchanged in this version. The Windows zip is built from the same app code as 1.4.0, with the new version number.
 
 ## [1.4.0] - 2026-11-22
 
