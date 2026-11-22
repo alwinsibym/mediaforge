@@ -4,6 +4,12 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+
+### Added
+
+- A project website in `site/`, published with GitHub Pages: overview, a short promo video, features, how it works, install options and a Download for Windows button that always points at the newest release. `scripts/make_promo.py` rebuilds the video from the real page with made-up data, and `scripts/make_guide_images.py --site` makes the clean screenshots it uses.
+
 ## [1.4.0] - 2026-11-22
 
 ### Added

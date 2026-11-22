@@ -1,6 +1,7 @@
 """Make the screenshots for docs/INSTALL.md from the running page, with made-up data.
 
-    python scripts/make_guide_images.py
+    python scripts/make_guide_images.py          # numbered pictures for docs/INSTALL.md
+    python scripts/make_guide_images.py --site   # clean pictures (no numbers) for the website
 
 Nothing is downloaded and no real file or link appears: the page talks to a stand-in for the
 downloader and FFmpeg. Needs Playwright (python -m playwright install chromium) and Pillow.
@@ -26,7 +27,8 @@ from app import downloader, jobs, main, transcoder
 from app import tweaks as tweaks_module
 from PIL import Image, ImageDraw
 
-OUT = ROOT / "docs" / "guide"
+SITE = "--site" in sys.argv
+OUT = ROOT / "site" / "img" if SITE else ROOT / "docs" / "guide"
 AMBER = "#f59e0b"
 FAKE_URL = "https://www.example.com/watch?v=sample-song"
 
@@ -194,7 +196,7 @@ def shot(page, name, selector=None, pad=24, items=(), clip_to=None, header=False
         "document.querySelector('.site-header').style.visibility = show ? '' : 'hidden'; }",
         header,
     )
-    page.evaluate(MARK_JS, [list(items)])
+    page.evaluate(MARK_JS, [[] if SITE else list(items)])
     page.wait_for_timeout(450)
     path = OUT / f"{name}.png"
     if selector:
@@ -310,11 +312,11 @@ def main_run(base: str) -> None:
         page.set_viewport_size({"width": 1100, "height": 1500})
         page.evaluate("document.getElementById('settings-btn').click()")
         page.wait_for_timeout(900)
-        page.evaluate(MARK_JS, [[("#ytdlp-update", 1)]])
+        page.evaluate(MARK_JS, [[] if SITE else [("#ytdlp-update", 1)]])
         page.locator("#settings-dialog").scroll_into_view_if_needed()
         page.wait_for_timeout(300)
         page.locator("#settings-dialog").screenshot(path=OUT / "07-settings.png")
-        print("wrote docs/guide/07-settings.png")
+        print("wrote", (OUT / "07-settings.png").relative_to(ROOT))
         page.keyboard.press("Escape")
 
         phone = browser.new_context(
@@ -338,6 +340,28 @@ def main_run(base: str) -> None:
         browser.close()
 
 
+def to_webp() -> None:
+    """For the website: keep four pictures as small WebP files and drop the rest."""
+    keep = {
+        "01-home": ("home", 1400),
+        "02-paste-link": ("paste-link", 1400),
+        "06-tweaks": ("tweaks", 1200),
+        "08-phone": ("phone", 520),
+    }
+    for png in OUT.glob("*.png"):
+        if png.stem in keep:
+            name, width = keep[png.stem]
+            image = Image.open(png).convert("RGB")
+            if image.width > width:
+                image = image.resize(
+                    (width, round(image.height * width / image.width)), Image.LANCZOS
+                )
+            image.save(OUT / f"{name}.webp", "WEBP", quality=86)
+        png.unlink()
+
+
 if __name__ == "__main__":
     port = start_server()
     main_run(f"http://127.0.0.1:{port}")
+    if SITE:
+        to_webp()
