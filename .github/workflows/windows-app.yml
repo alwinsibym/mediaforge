@@ -1,0 +1,66 @@
+name: windows-app
+
+# Builds the Windows app (MediaForge.exe in a folder, zipped), starts it and checks it works.
+#   - Pull requests that touch the packaging build it as a test.
+#   - A version tag (v1.4.0) builds it and attaches the zip to that release.
+#   - Actions > windows-app > Run workflow builds it for an existing tag, for example v1.3.0.
+
+on:
+  pull_request:
+    paths:
+      - "packaging/**"
+      - "run.py"
+      - "backend/requirements.txt"
+      - "backend/app/paths.py"
+      - "backend/app/ytdlp_update.py"
+      - ".github/workflows/windows-app.yml"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and attach to, for example v1.3.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pyinstaller
+      - name: Build
+        run: python packaging/build.py
+      - name: Start it and check it works
+        shell: bash
+        run: |
+          YT=$(python -c "import yt_dlp,os;print(os.path.dirname(yt_dlp.__file__))")
+          python packaging/smoke.py dist/MediaForge/MediaForge.exe "$YT"
+      - name: Keep the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: MediaForge-windows
+          path: dist/MediaForge-*-windows.zip
+      - name: Attach it to the release
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          # The release workflow creates the release when a tag is pushed; wait for it.
+          for i in $(seq 1 30); do
+            if gh release view "$TAG" >/dev/null 2>&1; then break; fi
+            sleep 10
+          done
+          gh release upload "$TAG" dist/MediaForge-*-windows.zip --clobber

@@ -14,7 +14,7 @@ from pathlib import Path
 import yt_dlp
 from yt_dlp.postprocessor.metadataparser import MetadataParserPP
 
-from . import config, cover, errors, ffmpeg_locator, formats, settings, validators
+from . import config, cover, errors, ffmpeg_locator, formats, paths, settings, validators
 from . import features as features_mod
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -200,7 +200,10 @@ _JS_RUNTIME_BINARIES = (
 
 def js_runtimes() -> dict:
     """Find installed JavaScript runtimes, including ones in the active venv."""
-    search_path = os.pathsep.join([str(Path(sys.executable).parent), os.environ.get("PATH", "")])
+    folders = [str(Path(sys.executable).parent), os.environ.get("PATH", "")]
+    if paths.FROZEN:
+        folders.insert(0, str(paths.bundle_dir()))  # the Windows app carries its own deno
+    search_path = os.pathsep.join(folders)
     found = {}
     for name, binary in _JS_RUNTIME_BINARIES:
         path = shutil.which(binary, path=search_path)

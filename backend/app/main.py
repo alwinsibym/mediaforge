@@ -32,12 +32,14 @@ from . import (
     gpu,
     history,
     jobs,
+    paths,
     pending,
     runtime,
     settings,
     transcoder,
     tweaks,
     validators,
+    ytdlp_update,
 )
 from .downloader import ConversionError
 
@@ -193,6 +195,8 @@ def health(request: Request) -> dict:
         "auth_required": bool(config.ACCESS_TOKEN),
         "authorised": _authorised(request),
         "can_quit": runtime.SERVER is not None and _is_local(request),
+        "can_install_ffmpeg": _winget() is not None and _is_local(request),
+        "packaged": paths.FROZEN,
     }
 
 
@@ -740,12 +744,23 @@ def discard_pending(pending_id: str, request: Request) -> dict:
 
 def _ytdlp_version() -> str:
     try:
-        return importlib.metadata.version("yt-dlp")
-    except importlib.metadata.PackageNotFoundError:
-        return "unknown"
+        from yt_dlp.version import __version__ as version
+
+        return version
+    except ImportError:
+        try:
+            return importlib.metadata.version("yt-dlp")
+        except importlib.metadata.PackageNotFoundError:
+            return "unknown"
 
 
 def _upgrade_ytdlp() -> dict:
+    if paths.FROZEN:
+        # The Windows app has no pip: download the newest yt-dlp into the updates folder.
+        try:
+            return ytdlp_update.install_latest(current=_ytdlp_version())
+        except ytdlp_update.UpdateError as exc:
+            raise ConversionError(f"The update failed: {exc}") from exc
     before = _ytdlp_version()
     command = [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp[default]"]
     try:
@@ -761,6 +776,44 @@ def _upgrade_ytdlp() -> dict:
         raise ConversionError(f"The update failed: {(lines or ['unknown error'])[-1][:200]}")
     after = _ytdlp_version()
     return {"before": before, "after": after, "changed": before != after}
+
+
+def _winget() -> str | None:
+    return shutil.which("winget") if sys.platform == "win32" else None
+
+
+def _install_ffmpeg() -> dict:
+    """Install FFmpeg with Windows' own package manager (winget)."""
+    winget = _winget()
+    if not winget:
+        raise ConversionError("This needs winget, which comes with current versions of Windows.")
+    command = [
+        winget, "install", "--id", "Gyan.FFmpeg", "--exact", "--silent",
+        "--accept-source-agreements", "--accept-package-agreements",
+    ]  # fmt: skip
+    try:
+        result = subprocess.run(  # noqa: S603
+            command, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        raise ConversionError("The installation could not be run. Try it in a terminal.") from None
+    found = downloader.ffmpeg_ready()
+    if result.returncode != 0 and not found:
+        lines = (result.stdout or result.stderr or "").strip().splitlines()
+        raise ConversionError(f"The installation failed: {(lines or ['unknown error'])[-1][:200]}")
+    return {"ok": found, "ffmpeg": found}
+
+
+@app.post("/api/install-ffmpeg")
+async def install_ffmpeg(request: Request) -> dict:
+    """Install FFmpeg for the person at this computer (Windows with winget)."""
+    _local_only(request)
+    if downloader.ffmpeg_ready():
+        return {"ok": True, "ffmpeg": True}
+    try:
+        return await run_in_threadpool(_install_ffmpeg)
+    except ConversionError as exc:
+        raise _bad_request(exc) from exc
 
 
 @app.post("/api/update-ytdlp")

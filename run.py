@@ -56,7 +56,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    from app import config, launcher
+    from app import config, launcher, paths
+
+    if paths.FROZEN:
+        args.open = True  # the Windows app always opens the page, like the desktop shortcut
 
     log = launcher.redirect_output_if_no_console(config.DATA_DIR)
 
@@ -96,7 +99,13 @@ def main() -> int:
 
     from app import runtime
 
-    server = uvicorn.Server(uvicorn.Config("app.main:app", host=host, port=port))
+    if paths.FROZEN:
+        from app.main import app as application  # a string import cannot find it in a bundle
+
+        config_ = uvicorn.Config(application, host=host, port=port, log_config=None)
+    else:
+        config_ = uvicorn.Config("app.main:app", host=host, port=port)
+    server = uvicorn.Server(config_)
     runtime.SERVER = server
     if args.open:
         threading.Thread(

@@ -27,6 +27,8 @@ Below 1.0.0 means "still changing". 1.0.0 is the first release the project calls
    changelog section as the notes. For a tag made earlier, open **Actions**, choose **release**,
    click **Run workflow** and type the tag, for example `v0.1.0`.
 
+Pushing the tag also builds the Windows app (`.github/workflows/windows-app.yml`), starts it as a check, and attaches `MediaForge-<version>-windows.zip` to the release. For a tag made earlier, run **windows-app** from the Actions tab and type the tag.
+
 The running app shows its version at `/api/health`.
 
 ## Branches
