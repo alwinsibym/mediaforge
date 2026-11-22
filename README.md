@@ -8,6 +8,8 @@ A media converter that runs on your own machine. Paste a video URL or upload a l
 
 It uses only free, open-source tools: [FastAPI](https://fastapi.tiangolo.com/), [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [FFmpeg](https://ffmpeg.org/). No accounts, API keys or paid services.
 
+**Website and download:** <https://alwinsibym.github.io/mediaforge/>
+
 ![MediaForge demo: paste a link, pick MP3, convert and download](docs/demo.gif)
 
 ![MediaForge screenshot](docs/screenshot.png)

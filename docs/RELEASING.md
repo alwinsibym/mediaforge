@@ -31,6 +31,10 @@ Pushing the tag also builds the Windows app (`.github/workflows/windows-app.yml`
 
 The running app shows its version at `/api/health`.
 
+## The website
+
+The website in `site/` is published by `.github/workflows/pages.yml` whenever `site/` changes on `main` (one-time setup: Settings > Pages > Source: GitHub Actions). Its Download button asks GitHub for the newest release and links to that Windows zip, so a new release needs no change to the site. To rebuild the promo video or the screenshots after the app's look changes, run `python scripts/make_promo.py` and `python scripts/make_guide_images.py --site`, then commit the files in `site/`.
+
 ## Branches
 
 Keep `main` working. Do new work on a branch such as `feature/proxy-setting`, merge it when the

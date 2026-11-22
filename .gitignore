@@ -45,3 +45,4 @@ node_modules/
 /dist/
 /build/
 /packaging/ytdlp_bundled.txt
+!site/media/*.mp4
