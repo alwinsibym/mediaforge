@@ -3,6 +3,8 @@
 import os
 from pathlib import Path
 
+from . import paths
+
 # Longest video (in seconds) that the URL converter will accept. 0 means no limit.
 MAX_DURATION_SECONDS = int(os.getenv("MEDIAFORGE_MAX_DURATION", "0"))
 
@@ -13,7 +15,7 @@ MAX_UPLOAD_MB = int(os.getenv("MEDIAFORGE_MAX_UPLOAD_MB", "0"))
 FRONTEND_DIR = Path(
     os.getenv(
         "MEDIAFORGE_FRONTEND_DIR",
-        Path(__file__).resolve().parents[2] / "frontend",
+        paths.bundle_dir() / "frontend",
     )
 )
 
@@ -21,7 +23,7 @@ FRONTEND_DIR = Path(
 DOWNLOAD_DIR = Path(
     os.getenv(
         "MEDIAFORGE_DOWNLOAD_DIR",
-        Path(__file__).resolve().parents[2] / "downloads",
+        paths.app_dir() / "downloads",
     )
 )
 
@@ -32,7 +34,7 @@ MAX_PLAYLIST_ITEMS = int(os.getenv("MEDIAFORGE_MAX_PLAYLIST_ITEMS", "200"))
 DATA_DIR = Path(
     os.getenv(
         "MEDIAFORGE_DATA_DIR",
-        Path(__file__).resolve().parents[2] / "data",
+        paths.data_dir(),
     )
 )
 

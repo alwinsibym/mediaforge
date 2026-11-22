@@ -40,3 +40,8 @@ site-report.md
 node_modules/
 
 !docs/demo.mp4
+
+# Windows app build
+/dist/
+/build/
+/packaging/ytdlp_bundled.txt

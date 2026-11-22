@@ -1,0 +1,19 @@
+MediaForge - read me first
+==========================
+
+1. Double-click MediaForge (MediaForge.exe). Your browser opens the page.
+   If Windows says "Windows protected your PC", click "More info", then "Run anyway".
+   (The program is not signed, which costs money. The source code is public.)
+
+2. MediaForge needs FFmpeg to convert files. If the page shows a red message about FFmpeg,
+   click "Install FFmpeg" in it. This uses Windows' own installer and needs internet.
+
+3. To stop MediaForge, use the power button at the top right of the page.
+
+Your settings, history and the log are in the "data" folder next to this program.
+Playlist downloads saved to a folder go in the "downloads" folder next to it.
+
+If links that used to work stop working, open Settings (top right) and click "Update yt-dlp",
+then close and open MediaForge again.
+
+Help and source code: https://github.com/alwinsibym/mediaforge

@@ -4,6 +4,20 @@ A step-by-step guide for Windows, with pictures. All names, links and files in t
 
 MediaForge runs on your own computer. It opens as a page in your browser, but nothing is sent to anyone else.
 
+## Fastest way: the Windows app (no Python)
+
+From version 1.4.0 each release has a file called `MediaForge-<version>-windows.zip` on the [Releases page](https://github.com/alwinsibym/mediaforge/releases).
+
+1. Download it and unzip it anywhere (for example your Desktop).
+2. Open the `MediaForge` folder and double-click `MediaForge.exe`. Your browser opens the page.
+   Windows may say "Windows protected your PC", because the program is not signed. Click **More info**, then **Run anyway**.
+3. If the page shows a red message about FFmpeg, click **Install FFmpeg** in it. It uses Windows' own installer and needs internet.
+4. Use the power button at the top right of the page to stop it.
+
+Your settings, history and log are in the `data` folder next to `MediaForge.exe`. **Update yt-dlp** in Settings works in the app too: it downloads the newest version into that folder, and the next start uses it.
+
+The rest of this guide shows the same pages, and also covers the Python install for people who want to change the code.
+
 ## 1. What you need
 
 | Item | How to get it |

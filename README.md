@@ -68,6 +68,8 @@ docker compose up --build
 
 Open <http://localhost:8000>.
 
+**Windows without Python:** download `MediaForge-<version>-windows.zip` from the [Releases page](https://github.com/alwinsibym/mediaforge/releases), unzip it and double-click `MediaForge.exe`.
+
 New to this? [docs/INSTALL.md](docs/INSTALL.md) is a step-by-step Windows guide with pictures.
 
 ## Manual setup

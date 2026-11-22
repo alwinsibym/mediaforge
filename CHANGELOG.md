@@ -4,6 +4,14 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
+## [Unreleased]
+
+### Added
+
+- A Windows app: `MediaForge.exe` in a zip attached to each release, so no Python is needed. It is built and tested by a GitHub workflow.
+- In the app, Settings > Update yt-dlp downloads the newest yt-dlp from PyPI (checked against its published checksum) into the `data` folder; the next start uses it, and a broken or older update is removed automatically.
+- An "Install FFmpeg" button in the FFmpeg warning (Windows, uses winget).
+
 ## [1.3.0] - 2026-11-22
 
 ### Added
