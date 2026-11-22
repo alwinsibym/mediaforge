@@ -16,9 +16,8 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 
 def main() -> int:
-    from yt_dlp.version import __version__ as ytdlp_version
-
     from app import __version__
+    from yt_dlp.version import __version__ as ytdlp_version
 
     (ROOT / "packaging" / "ytdlp_bundled.txt").write_text(
         ytdlp_version + "\n", encoding="utf-8"

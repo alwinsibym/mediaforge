@@ -27,7 +27,7 @@ def get(port: int, path: str) -> bytes:
 
 def run_app(exe: Path, work: Path) -> tuple[subprocess.Popen, int]:
     port = free_port()
-    process = subprocess.Popen([str(exe), "--port", str(port)], cwd=work)  # noqa: S603
+    process = subprocess.Popen([str(exe), "--port", str(port)], cwd=work)
     for _ in range(120):
         try:
             get(port, "/api/health")
@@ -44,7 +44,7 @@ def run_app(exe: Path, work: Path) -> tuple[subprocess.Popen, int]:
 
 def stop(process: subprocess.Popen, port: int) -> None:
     try:
-        urllib.request.urlopen(  # noqa: S310
+        urllib.request.urlopen(
             urllib.request.Request(f"http://127.0.0.1:{port}/api/quit", method="POST"),
             timeout=10,
         )
