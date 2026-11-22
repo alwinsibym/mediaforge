@@ -395,6 +395,12 @@ def join(scenes):
         ],
         check=True,
     )
+    # The share image for links on social sites and chat apps: 1200 x 630.
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-i", str(OUT / "poster.jpg"),
+         "-vf", "scale=1200:-1,crop=1200:630", "-q:v", "3", str(OUT / "og.jpg")],
+        check=True,
+    )
 
 
 if __name__ == "__main__":

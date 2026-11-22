@@ -1,0 +1,18 @@
+# MediaForge
+
+> MediaForge is a free, open-source media converter that runs on the user's own computer. Paste a video link or choose a local file, pick a format, and download the result as MP3, M4A, AAC, WAV, FLAC, OGG, Opus, MP4, WebM or MKV. It is a local web app (FastAPI, yt-dlp, FFmpeg, plain HTML/CSS/JS) with a Windows app that needs no Python. MIT licensed, made by Alwin as a learning and portfolio project.
+
+Key facts:
+- Cost: free, no account, no ads. Files are processed on the user's computer.
+- Platforms: Windows 10/11 app (zip, no installer); Docker or Python 3.10+ on Windows, macOS and Linux.
+- Inputs: links from any site yt-dlp supports, playlists, and local audio or video files.
+- Extras: volume, trim, subtitles, sponsor-segment skipping, chapter splitting, target file size, and spatial sound for headphones (orbit, front, back, sides, room, movie-style surround).
+- Not a hosted service. It is meant to run locally. Users are responsible for having the right to download and convert the content they use.
+
+## Pages
+- [Website](https://mediaforge-zeta.vercel.app/): overview, promo video, supported formats, install options, FAQ.
+- [Download the Windows app](https://github.com/alwinsibym/mediaforge/releases/latest): latest release with MediaForge-<version>-windows.zip.
+- [Source code and README](https://github.com/alwinsibym/mediaforge): full feature list, settings, API and troubleshooting.
+- [Install guide](https://github.com/alwinsibym/mediaforge/blob/main/docs/INSTALL.md): step-by-step with pictures.
+- [Changelog](https://github.com/alwinsibym/mediaforge/blob/main/CHANGELOG.md): what changed in each version.
+- [Report a problem](https://github.com/alwinsibym/mediaforge/issues)
