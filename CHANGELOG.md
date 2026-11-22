@@ -4,8 +4,7 @@ All notable changes to MediaForge are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/): `MAJOR.MINOR.PATCH`.
 
-## [Unreleased]
-
+## [1.4.0] - 2026-11-22
 ### Added
 
 - A Windows app: `MediaForge.exe` in a zip attached to each release, so no Python is needed. It is built and tested by a GitHub workflow.
