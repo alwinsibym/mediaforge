@@ -6,22 +6,20 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
-- The site hides the page scrollbar for a cleaner look. Scrolling by wheel, touch, keyboard and links works as before.
-- The video has a new score: a soft felt piano over a warm pad, with no drums, in place of the bells and beat.
-- In the spatial sound scene, a few notes and breaths of air travel around the listener in step with the dot on screen.
-- The promo video is now an explainer: what MediaForge is, how it works, a live conversion, the tweaks, spatial sound, privacy, every screen size, and how to get it. It is 69 seconds long. The tweaks appear in an Apple-style grid of tiles, and headlines pair an italic serif with bold sans. There is a new opening and closing, and matching music.
-- The video no longer shows a stale copy: media links carry a content hash, so a changed file is fetched again.
-- The video frame is now exactly the video: the fake window bar is gone, so there is no extra height.
-- Phones: the header no longer overflows at 360 px, the formats table becomes cards, and the wide diagram has a swipe hint.
-
-### Added
-
-- An opening animation on the website: the logo builds, the name appears, and a curtain lifts onto the page. It plays once per visit, is skipped for people who prefer reduced motion or on a repeat view, and never hides the page content from search engines.
-- `scripts/make_score.py` composes an original, royalty-free score (soft pads, glass-like bells and a gentle heartbeat beat on a 96 bpm grid) for the promo video.
+## [1.5.1] - 2026-11-23
 
 ### Changed
 
-- The promo video is remade in 1080p with headlines, a floating app window, a desktop-tablet-phone scene, cuts on the beats of the score, and sound.
+- The website's promo video is now a 69-second explainer: what MediaForge is, how it works, a live conversion, the tweaks, spatial sound, privacy, every screen size and how to get it. The tweaks appear in an Apple-style grid of tiles, and headlines pair an italic serif with bold sans, with a new opening and closing.
+- The video has a new score, composed by `scripts/make_score.py`: a soft felt piano over a warm pad, with no drums. In the spatial sound scene, a few notes and breaths of air travel around the listener in step with the dot on screen.
+- The website has an opening animation: the logo builds, the name appears, and a curtain lifts onto the page. It plays once per visit and is skipped for people who prefer reduced motion. It never hides the page content from search engines.
+- The website hides the page scrollbar for a cleaner look. Scrolling by wheel, touch, keyboard and links works as before.
+
+### Fixed
+
+- The video no longer shows an old copy after it changes: media links carry a content hash, so a changed file is fetched again.
+- The video frame is exactly the video. The fake window bar and the fixed height are gone, so there is no extra space.
+- Phones: the website header no longer overflows at 360 px wide, the formats table becomes cards, and the wide diagram has a swipe hint.
 
 ## [1.5.0] - 2026-11-22
 
