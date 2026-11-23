@@ -23,6 +23,16 @@
     } catch (e) { /* the choice just will not be remembered */ }
   });
 
+  /* The opening animation ends by itself with CSS; this only takes it out of the page afterwards. */
+  var intro = document.getElementById("intro");
+  if (intro) {
+    var remove = function () { if (intro.parentNode) intro.parentNode.removeChild(intro); };
+    intro.addEventListener("animationend", function (e) { if (e.animationName === "intro-out") remove(); });
+    setTimeout(remove, 3500);
+    /* Keep the class until the page's own entrance has finished, so it is not cut short. */
+    setTimeout(function () { root.classList.remove("intro"); }, 3600);
+  }
+
   var bar = document.getElementById("bar");
   function onScroll() { bar.classList.toggle("is-scrolled", window.scrollY > 8); }
   onScroll();

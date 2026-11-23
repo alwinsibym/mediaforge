@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="promo.css">
+<style>
+.mark{width:150px;height:150px;opacity:0;transform:scale(.8);filter:blur(14px)}
+.go .mark{animation:markin 1.6s cubic-bezier(.16,1,.3,1) .2s both}
+@keyframes markin{to{opacity:1;transform:none;filter:none}}
+.bar{transform-box:fill-box;transform-origin:center;transform:scaleY(0)}
+.go .bar{animation:bar 1.3s cubic-bezier(.16,1,.3,1) calc(.7s + var(--k) * .09s) both}
+@keyframes bar{to{transform:scaleY(1)}}
+h1{font-size:150px;font-weight:700;font-stretch:104%;letter-spacing:-.035em;margin-top:56px}
+h1 .w{margin:0 .1em}
+p{font-size:46px;color:#9aa5c8;margin-top:34px;letter-spacing:-.005em}
+</style>
+<div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+<div class="center">
+<svg class="mark" viewBox="0 0 32 32"><rect width="32" height="32" rx="9" fill="#8a9bff"/>
+<rect class="bar" style="--k:0" x="6" y="13" width="3.4" height="6" rx="1.7" fill="#05070f"/><rect class="bar" style="--k:1" x="11.2" y="8" width="3.4" height="16" rx="1.7" fill="#05070f"/>
+<rect class="bar" style="--k:2" x="16.4" y="11" width="3.4" height="10" rx="1.7" fill="#05070f"/><rect class="bar" style="--k:3" x="21.6" y="6" width="3.4" height="20" rx="1.7" fill="#05070f"/></svg>
+<h1><span class="w" style="--i:7">MediaForge</span></h1>
+<p class="fade" style="--d:2.7s">Your media. On your machine.</p>
+</div>

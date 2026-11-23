@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="promo.css">
+<style>
+h1{font-size:176px;line-height:1.04;font-weight:700;font-stretch:104%;letter-spacing:-.04em;padding:0 120px}
+h1 .w{margin:0 .13em}
+p{font-size:42px;font-weight:400;color:#9aa5c8;margin-top:44px;letter-spacing:-.005em;max-width:1300px;line-height:1.35}
+</style>
+<div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+<div class="center"><h1 id="t"></h1><p class="fade" id="s" style="--d:1.1s"></p></div>
+<script>
+const q=new URLSearchParams(location.search);let i=0;
+const t=document.getElementById("t");
+(q.get("t")||"").split("|").forEach((line,n)=>{if(n)t.append(document.createElement("br"));
+  line.split(" ").forEach(word=>{const s=document.createElement("span");s.className="w";s.style.setProperty("--i",i++);s.textContent=word;t.append(s)})});
+document.getElementById("s").textContent=q.get("s")||"";
+</script>

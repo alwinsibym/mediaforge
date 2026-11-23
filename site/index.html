@@ -68,10 +68,10 @@
   "@context": "https://schema.org",
   "@type": "VideoObject",
   "name": "MediaForge tour",
-  "description": "A short tour of MediaForge: paste a link, choose a format, convert, use the spatial sound tweak, and open it on a phone. All data shown is made up.",
+  "description": "A 50-second tour of MediaForge with music: paste a link, choose a format, convert, use the spatial sound tweak, and see the same page on a phone, a tablet and a computer. All data shown is made up.",
   "thumbnailUrl": "https://mediaforge-zeta.vercel.app/media/poster.jpg",
   "uploadDate": "2026-11-22",
-  "duration": "PT36S",
+  "duration": "PT50S",
   "contentUrl": "https://mediaforge-zeta.vercel.app/media/promo.mp4",
   "embedUrl": "https://mediaforge-zeta.vercel.app/"
 }
@@ -138,9 +138,33 @@
       var saved = localStorage.getItem("mediaforge-site-theme");
       if (saved === "light" || saved === "dark") document.documentElement.dataset.theme = saved;
     } catch (e) {}
+    /* Play the opening animation once per visit. It is skipped for people who prefer reduced
+       motion, on a repeat view in the same tab, and with ?nointro. It is only decoration: the
+       page content is in the HTML underneath and the overlay removes itself in under 3 seconds. */
+    try {
+      var calm = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (!calm && !sessionStorage.getItem("mediaforge-intro") && location.search.indexOf("nointro") < 0) {
+        document.documentElement.classList.add("intro");
+        sessionStorage.setItem("mediaforge-intro", "1");
+      }
+    } catch (e) {}
   </script>
 </head>
 <body id="top">
+  <div class="intro-screen" id="intro" aria-hidden="true">
+    <div class="intro-glow"></div>
+    <div class="intro-mark">
+      <svg viewBox="0 0 32 32">
+        <rect class="im-tile" width="32" height="32" rx="9"/>
+        <rect class="im-bar" x="6" y="13" width="3.4" height="6" rx="1.7"/>
+        <rect class="im-bar" x="11.2" y="8" width="3.4" height="16" rx="1.7"/>
+        <rect class="im-bar" x="16.4" y="11" width="3.4" height="10" rx="1.7"/>
+        <rect class="im-bar" x="21.6" y="6" width="3.4" height="20" rx="1.7"/>
+      </svg>
+      <span class="intro-word">MediaForge</span>
+      <span class="intro-line"></span>
+    </div>
+  </div>
   <a class="skip" href="#main">Skip to the content</a>
 
   <header class="bar" id="bar">
@@ -197,12 +221,12 @@
       <figure class="stage">
         <div class="window">
           <div class="window-bar" aria-hidden="true"><i></i><i></i><i></i></div>
-          <video id="promo" width="1280" height="720" controls preload="metadata" playsinline poster="media/poster.jpg" aria-label="MediaForge promo video, about 36 seconds">
+          <video id="promo" width="1920" height="1080" controls preload="metadata" playsinline poster="media/poster.jpg" aria-label="MediaForge promo video, about 50 seconds, with music">
             <source src="media/promo.mp4" type="video/mp4">
             <a href="media/promo.mp4">Watch the promo video</a>
           </video>
         </div>
-        <figcaption>A short tour. Everything shown uses made-up data.</figcaption>
+        <figcaption>A 50-second tour, with music. Everything shown uses made-up data.</figcaption>
       </figure>
     </section>
 
