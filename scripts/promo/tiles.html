@@ -1,0 +1,71 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="promo.css">
+<style>
+.head{top:84px}.head h1{font-size:96px}
+.bento{position:absolute;left:140px;top:300px;width:1640px;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(3,210px);gap:20px}
+.t{position:relative;overflow:hidden;padding:30px 36px}
+.t h3{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.t p{font-size:22px;color:#9aa5c8;margin-top:6px}
+.big{grid-column:1/3;grid-row:1/3}.wide-t{grid-column:3/5;grid-row:1}.sub{grid-column:3;grid-row:2}.chap{grid-column:4;grid-row:2}
+.size{grid-column:1/3;grid-row:3}.tags{grid-column:3/5;grid-row:3}
+.t{--r:0}
+.item{filter:blur(8px)}.go .item{animation:bin 1.2s cubic-bezier(.16,1,.3,1) var(--d,0s) both}
+@keyframes bin{from{opacity:0;transform:translateY(34px) scale(.94);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}
+@keyframes fadein{to{opacity:1}}
+/* volume */
+.num{position:absolute;right:38px;top:22px;font-size:132px;font-weight:300;letter-spacing:-.05em;line-height:1;color:#e6eaff;font-variant-numeric:tabular-nums}
+.num small{font-size:54px;color:#8a9bff;margin-left:4px}
+.wv{position:absolute;left:36px;right:36px;bottom:92px;height:170px;display:flex;align-items:flex-end;gap:6px;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent)}
+.wv i{flex:1;border-radius:4px;background:linear-gradient(#a5b4ff,#6366f1);height:calc(var(--h) * var(--g,1));max-height:100%}
+.trk{position:absolute;left:36px;right:36px;bottom:44px;height:8px;border-radius:5px;background:rgba(255,255,255,.14)}
+.trk b{position:absolute;left:0;top:0;bottom:0;width:calc((var(--g,1) - 1) / .5 * 100%);border-radius:5px;background:linear-gradient(90deg,#8a9bff,#c4b5fd)}
+.trk u{position:absolute;top:-9px;left:calc((var(--g,1) - 1) / .5 * 100%);width:26px;height:26px;margin-left:-13px;border-radius:50%;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+/* trim */
+.wave{position:absolute;left:36px;right:36px;bottom:26px;height:56px;display:flex;align-items:center;gap:5px}
+.wave i{flex:1;background:rgba(255,255,255,.22);border-radius:3px;height:var(--h)}
+.sel{position:absolute;left:36px;right:36px;bottom:14px;height:80px;border-left:5px solid #8a9bff;border-right:5px solid #8a9bff;background:rgba(138,155,255,.16);border-radius:8px}
+.go .sel{animation:trim 2.4s cubic-bezier(.65,0,.35,1) 2.0s both}
+@keyframes trim{from{left:36px;right:36px}to{left:22%;right:26%}}
+/* subtitles */
+.frame{position:absolute;left:36px;right:36px;bottom:26px;height:84px;border-radius:12px;background:linear-gradient(135deg,#25306a,#3b2a6b)}
+.cap{position:absolute;left:50%;transform:translateX(-50%);height:12px;border-radius:4px;background:#f3f5ff;opacity:0}
+.c1{bottom:58px;width:52%}.c2{bottom:40px;width:34%}
+.go .c1{animation:fadein .6s ease 2.3s forwards}.go .c2{animation:fadein .6s ease 2.6s forwards}
+.cc{position:absolute;right:48px;bottom:84px;font-size:17px;font-weight:700;padding:1px 8px;border-radius:6px;border:2px solid #cfd6ff;color:#cfd6ff;opacity:0}
+.go .cc{animation:fadein .6s ease 2.1s forwards}
+/* chapters */
+.line{position:absolute;left:36px;right:36px;bottom:52px;height:6px;border-radius:4px;background:rgba(255,255,255,.16)}
+.mk{position:absolute;bottom:42px;width:4px;height:28px;border-radius:3px;background:#8a9bff;transform:scaleY(0);transform-origin:bottom}
+.go .mk{animation:mark .7s cubic-bezier(.16,1,.3,1) var(--d) forwards}@keyframes mark{to{transform:none}}
+/* size */
+.bar{position:absolute;left:36px;height:30px;border-radius:10px;font-size:20px;font-weight:600;display:flex;align-items:center;padding:0 16px}
+.b1{bottom:62px;right:36px;background:rgba(255,255,255,.14);color:#c7cffb}
+.b2{bottom:22px;width:calc(100% - 72px);background:linear-gradient(90deg,#8a9bff,#c4b5fd);color:#0b1030;overflow:hidden;white-space:nowrap}
+.go .b2{animation:shrink 2.2s cubic-bezier(.65,0,.35,1) 2.0s forwards}@keyframes shrink{to{width:24%}}
+/* tags */
+.cover{position:absolute;left:36px;bottom:20px;width:84px;height:84px;border-radius:16px;background:linear-gradient(135deg,#8a9bff,#a855f7,#0ea5e9);opacity:0}
+.go .cover{animation:fadein .7s ease 2.0s forwards}
+.chips{position:absolute;left:146px;bottom:44px;display:flex;gap:14px}
+.chips span{font-size:23px;padding:8px 20px;border-radius:999px;border:1px solid rgba(255,255,255,.18);color:#c7cffb;opacity:0;width:max-content}
+.go .chips span{animation:fadein .6s ease var(--d) forwards}
+</style>
+<div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+<div class="head"><h1><span class="w it" style="--i:0">Every detail,</span><span class="w" style="--i:1">considered.</span></h1></div>
+<div class="bento">
+<div class="t glass big item" style="--d:.7s"><h3>Volume and fades</h3><p>Lift quiet audio. Ease in and out.</p>
+ <div class="num"><span id="n">100</span><small>%</small></div><div class="wv" id="wv"></div><div class="trk"><b></b><u></u></div></div>
+<div class="t glass wide-t item" style="--d:1.0s"><h3>Trim</h3><p>Keep only the part you need.</p><div class="wave" id="wave"></div><div class="sel"></div></div>
+<div class="t glass sub item" style="--d:1.15s"><h3>Subtitles</h3><div class="frame"></div><div class="cap c1"></div><div class="cap c2"></div><div class="cc">CC</div></div>
+<div class="t glass chap item" style="--d:1.3s"><h3>Chapters</h3><div class="line"></div>
+ <div class="mk" style="left:11%;--d:2.1s"></div><div class="mk" style="left:34%;--d:2.4s"></div><div class="mk" style="left:60%;--d:2.7s"></div><div class="mk" style="left:84%;--d:3.0s"></div></div>
+<div class="t glass size item" style="--d:1.45s"><h3>Smaller files</h3><p>Aim for a size, such as 25 MB.</p><div class="bar b1">120 MB</div><div class="bar b2">25 MB</div></div>
+<div class="t glass tags item" style="--d:1.6s"><h3>Tags and cover art</h3><p>Title, artist and picture, in the file.</p><div class="cover"></div>
+ <div class="chips"><span style="--d:2.1s">Title</span><span style="--d:2.3s">Artist</span><span style="--d:2.5s">Album</span></div></div>
+</div>
+<script>
+const wv=document.getElementById("wv");for(let i=0;i<46;i++){const e=document.createElement("i");e.style.setProperty("--h",(26+Math.abs(Math.sin(i*.55)*50)+((i*37)%19))+"%");wv.append(e)}
+const w=document.getElementById("wave");for(let i=0;i<60;i++){const e=document.createElement("i");e.style.setProperty("--h",(24+Math.abs(Math.sin(i*.7)*58)+((i*37)%17))+"%");w.append(e)}
+const big=document.querySelector(".big"),n=document.getElementById("n");
+const run=()=>{const t0=performance.now();const f=()=>{const k=Math.min(Math.max((performance.now()-t0-1500)/2300,0),1),e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2,g=1+.3*e;big.style.setProperty("--g",g);n.textContent=Math.round(g*100);if(k<1)requestAnimationFrame(f)};f()};
+new MutationObserver((m,o)=>{if(document.body.classList.contains("go")){o.disconnect();run()}}).observe(document.body,{attributes:true});
+</script>

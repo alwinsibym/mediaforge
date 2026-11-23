@@ -6,6 +6,11 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+- The promo video is now an explainer: what MediaForge is, how it works, a live conversion, the tweaks, spatial sound, privacy, every screen size, and how to get it. It is 69 seconds long. The tweaks appear in an Apple-style grid of tiles, and headlines pair an italic serif with bold sans. There is a new opening and closing, and matching music.
+- The video no longer shows a stale copy: media links carry a content hash, so a changed file is fetched again.
+- The video frame is now exactly the video: the fake window bar is gone, so there is no extra height.
+- Phones: the header no longer overflows at 360 px, the formats table becomes cards, and the wide diagram has a swipe hint.
+
 ### Added
 
 - An opening animation on the website: the logo builds, the name appears, and a curtain lifts onto the page. It plays once per visit, is skipped for people who prefer reduced motion or on a repeat view, and never hides the page content from search engines.
@@ -13,7 +18,7 @@ All notable changes to MediaForge are listed here. The format follows
 
 ### Changed
 
-- The promo video is remade in 1080p with headlines, a floating app window, a desktop-tablet-phone scene, cuts on the beats of the score, and sound. It is 50 seconds long.
+- The promo video is remade in 1080p with headlines, a floating app window, a desktop-tablet-phone scene, cuts on the beats of the score, and sound.
 
 ## [1.5.0] - 2026-11-22
 

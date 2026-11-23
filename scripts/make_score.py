@@ -3,7 +3,7 @@
     python scripts/make_score.py [output.wav]
 
 It is made entirely from sine and noise sources in numpy, so there is nothing to license.
-96 beats per minute, 80 beats (50 seconds), in C major: a warm pad, a soft sub bass, glassy
+96 beats per minute, 110 beats (about 69 seconds), in C major: a warm pad, a soft sub bass, glassy
 bell notes with a ping-pong echo, and a quiet heartbeat kick with a light rim and hat. The beat
 numbers of the video's scenes are in SCENES below, so the picture and the music change together.
 """
@@ -18,19 +18,20 @@ from scipy.io import wavfile
 SR = 44100
 BPM = 96
 BEAT = 60 / BPM
-TOTAL_BEATS = 80
-LENGTH = TOTAL_BEATS * BEAT  # 50 s
+TOTAL_BEATS = 110
+LENGTH = TOTAL_BEATS * BEAT  # 68.75 s
 
 # Scene start beats, shared with scripts/make_promo.py.
-SCENES = {"intro": 0, "c1": 8, "ui1": 13, "c2": 23, "ui2": 28, "c3": 40, "ui3": 45,
-          "c4": 55, "phone": 60, "end": 68}
+SCENES = {"intro": 0, "what": 8, "pipe": 16, "demo": 28, "tweaks": 48, "spatial": 60,
+          "local": 72, "phone": 80, "get": 90, "end": 98}
 
 C9 = [48, 55, 59, 62, 64]
 AM9 = [45, 52, 55, 59, 60]
 F9 = [41, 48, 52, 57, 60]
 G69 = [43, 50, 52, 57, 59]
 CHORDS = [(0, C9), (8, AM9), (16, F9), (24, G69), (32, C9), (40, AM9), (48, F9), (56, G69),
-          (64, F9), (68, C9)]
+          (64, C9), (72, AM9), (80, F9), (88, G69), (98, C9)]
+FINAL = 98  # the closing chord and the last flourish
 
 rng = np.random.default_rng(7)
 
@@ -146,15 +147,13 @@ def arpeggio_notes(chord, b):
     """Which bell notes play in beat `b`, as (offset in beats, midi, velocity)."""
     top = [chord[2] + 24, chord[3] + 24, chord[4] + 24, chord[1] + 24, chord[3] + 12]
     notes = []
-    if b < 4:
+    if b < 4 or b >= 94:  # the riser and the closing chord are left clear
         return notes
-    dense = 13 <= b < 56 or 60 <= b < 72
+    dense = 16 <= b < 72 or 80 <= b < 94
     sparse = not dense
     for half in (0, 1):
         n = (b * 2 + half)
         if sparse and half == 1:
-            continue
-        if b >= 72 and n % 2:
             continue
         pick = top[(n * 3 + n // 4) % len(top)]
         vel = (0.55 if dense else 0.42) * (1.0 if half == 0 else 0.7)
@@ -169,7 +168,7 @@ def compose():
     for i, (start_beat, chord) in enumerate(CHORDS):
         end_beat = CHORDS[i + 1][0] if i + 1 < len(CHORDS) else TOTAL_BEATS
         seconds = (end_beat - start_beat) * BEAT
-        big = start_beat == 68
+        big = start_beat == FINAL
         for k, midi in enumerate(chord):
             put(pads, pad_note(midi, seconds, attack=0.9 if big else 1.5) * (1.5 if big else 1.0),
                 start_beat * BEAT, pan=(k - 2) * 0.18)
@@ -186,16 +185,16 @@ def compose():
             put(bells, bell(midi, vel), (b + offset) * BEAT, pan=0.35 if int(b * 2 + offset * 2) % 2 else -0.35)
     for beat, midi in ((0, 79), (2.5, 76), (5, 84)):  # the logo
         put(bells, bell(midi, 0.9, 4.0), beat * BEAT, pan=0.15)
-    for name in ("c1", "c2", "c3", "c4"):  # each headline arrives with one clear note
-        put(bells, bell(83 if name in ("c1", "c3") else 79, 1.0, 3.5), SCENES[name] * BEAT, pan=-0.1)
+    for k, name in enumerate(("what", "pipe", "tweaks", "spatial", "local", "get")):
+        put(bells, bell(83 if k % 2 == 0 else 79, 1.0, 3.5), SCENES[name] * BEAT, pan=-0.1)  # one clear note per headline
     for k, midi in enumerate((72, 76, 79, 83, 88)):  # the closing flourish
-        put(bells, bell(midi, 0.95, 4.5), (68 + k * 0.5) * BEAT, pan=(k - 2) * 0.2)
+        put(bells, bell(midi, 0.95, 4.5), (FINAL + k * 0.5) * BEAT, pan=(k - 2) * 0.2)
     bells = echo(bells, BEAT * 0.75, 0.38, 0.55)
 
     # The beat: quiet and soft, building a little, easing off, and dropping away at the end.
-    for b in range(8, 72):
-        full = 13 <= b < 56 or 60 <= b < 68
-        if b < 13 or 56 <= b < 60:
+    for b in range(8, 94):
+        full = 16 <= b < 72 or 80 <= b < 94
+        if not full:
             if b % 2 == 0:
                 put(drums, kick(0.7), b * BEAT)
             continue
@@ -207,8 +206,8 @@ def compose():
             put(drums, hat(0.7), (b + 0.5) * BEAT, pan=-0.15)
             if b % 2 == 1:
                 put(drums, hat(0.5), b * BEAT, pan=0.15)
-    put(drums, kick(1.15), 68 * BEAT)
-    put(drums, riser(4 * BEAT), 64 * BEAT)
+    put(drums, kick(1.15), FINAL * BEAT)
+    put(drums, riser(4 * BEAT), 94 * BEAT)
 
     # Space around the pad and the bells.
     ir = reverb_ir()
