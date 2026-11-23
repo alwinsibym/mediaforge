@@ -112,6 +112,24 @@ def test_qualities_list_what_the_video_really_offers():
     assert qualities[0]["size"] == 100 * 2160 + 5000
 
 
+def _sized(fid, width, height, fps=24):
+    return {**_video(fid, height, fps, "vp9", "webm"), "width": width, "height": height}
+
+
+def test_wide_film_frames_are_named_like_the_site_names_them():
+    # A 2.39:1 film upload: YouTube lists these as 1080p, 1440p and 2160p (4K).
+    formats = [_sized("a", 1920, 804), _sized("b", 2560, 1072), _sized("c", 3840, 1608)]
+    qualities = downloader._video_qualities(formats)
+    assert [q["label"] for q in qualities] == ["2160p (4K)", "1440p (2K)", "1080p"]
+    # The id still follows the real height, so choosing it picks exactly that stream.
+    assert [q["id"] for q in qualities] == ["1608", "1072", "804"]
+
+
+def test_tall_videos_are_named_by_their_short_side():
+    qualities = downloader._video_qualities([_sized("a", 1080, 1920, 30)])
+    assert qualities[0]["label"] == "1080p"
+
+
 def test_qualities_are_empty_without_video_streams():
     assert downloader._video_qualities([_audio("m4a", "aac", "m4a")]) == []
 

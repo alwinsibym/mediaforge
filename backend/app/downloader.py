@@ -254,6 +254,14 @@ def aria2c_available() -> bool:
 _RESOLUTION_NAMES = {4320: "8K", 2160: "4K", 1440: "2K"}
 
 
+def _nominal_height(width: int, height: int) -> int:
+    """The "p" number a site would call this picture, so a wide film frame such as 3840 x 1608
+    is a 2160p (4K) video, as YouTube lists it. A 16:9 or taller picture keeps its own height."""
+    if width >= height:
+        return max(height, round(width * 9 / 16))
+    return width  # a tall (phone) video is named by its short side
+
+
 def _format_size(entry: dict) -> int | None:
     return entry.get("filesize") or entry.get("filesize_approx")
 
@@ -284,7 +292,8 @@ def _video_qualities(source_formats: list[dict]) -> list[dict]:
         group = by_height[height]
         smooth = [f for f in group if (f.get("fps") or 30) > 30]
         normal = [f for f in group if (f.get("fps") or 30) <= 30]
-        name = _RESOLUTION_NAMES.get(height)
+        nominal = max(_nominal_height(int(f["width"]), height) for f in group)
+        name = _RESOLUTION_NAMES.get(nominal)
         # (id, formats, label suffix); the smooth variant is the default for this height.
         variants = []
         if smooth:
@@ -300,7 +309,7 @@ def _video_qualities(source_formats: list[dict]) -> list[dict]:
             qualities.append(
                 {
                     "id": quality_id,
-                    "label": f"{height}{suffix}" + (f" ({name})" if name else ""),
+                    "label": f"{nominal}{suffix}" + (f" ({name})" if name else ""),
                     "height": height,
                     "fps": round(max(f.get("fps") or 30 for f in members)),
                     "size": size,
