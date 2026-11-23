@@ -1,10 +1,12 @@
-"""Make the promo video for the website: site/media/promo.mp4 and site/media/poster.jpg.
+"""Make the promo video for the website: site/media/promo.mp4, poster.jpg and og.jpg.
 
     python scripts/make_promo.py
 
-The scenes are filmed from the real page with made-up data (no internet, nothing is downloaded),
-the same way scripts/make_guide_images.py works. A caption bar and a mouse pointer are drawn on
-top. Needs Playwright (python -m playwright install chromium), FFmpeg and Pillow.
+Opening, headlines and closing are small HTML pages in scripts/promo/. The app scenes show the
+real MediaForge page, running here with made-up data (nothing is downloaded), inside a floating
+window. A pointer is drawn on top. The pictures are filmed at 1920 x 1080, cut on the beats of
+the score from scripts/make_score.py, dip through black between scenes, and the score is added.
+Needs Playwright (python -m playwright install chromium), FFmpeg, numpy, scipy and Pillow.
 """
 
 import asyncio
@@ -18,45 +20,58 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-import make_guide_images as guide
-from app import downloader
+import make_guide_images as guide  # noqa: E402
+import make_score as score  # noqa: E402
+from app import downloader  # noqa: E402
 
 OUT = ROOT / "site" / "media"
 PROMO = ROOT / "scripts" / "promo"
 WORK = Path(tempfile.mkdtemp(prefix="mediaforge-promo-"))
-W, H, FPS = 1280, 720, 30
+W, H, FPS = 1920, 1080, 30
+BEAT = score.BEAT
 URL = guide.FAKE_URL
+STAGE_BG = "05070f"
 
-# A pointer and a caption bar, drawn inside every page that is filmed.
+# The order of the scenes. Their lengths come from the beat numbers in make_score.py.
+ORDER = ["intro", "c1", "ui1", "c2", "ui2", "c3", "ui3", "c4", "phone", "end"]
+CARDS = {
+    "c1": ("Paste a link.", "Any site that yt-dlp supports."),
+    "c2": ("Choose a format.", "Ten of them, from MP3 to MKV."),
+    "c3": ("Hear it differently.", "Spatial sound, made for headphones."),
+    "c4": ("On every screen.", "The same page on a phone, a tablet or a computer."),
+}
+
+
+def seconds(name):
+    start = score.SCENES[name]
+    later = [v for v in score.SCENES.values() if v > start]
+    return ((min(later) if later else score.TOTAL_BEATS) - start) * BEAT
+
+
+# A pointer, drawn inside every page that is filmed.
 OVERLAY_JS = """
 (() => {
-  let cur, rip, cap;
-  window.__cap = (text) => {
-    if (!cap) return;
-    cap.classList.remove('on');
-    if (!text) return;
-    setTimeout(() => { cap.textContent = text; cap.classList.add('on'); }, 220);
-  };
+  let cur, rip;
   const boot = () => {
     const css = document.createElement('style');
     css.textContent = `
-      #mf-cursor{position:fixed;z-index:2147483647;left:0;top:0;width:26px;height:26px;pointer-events:none;
-        transform:translate(-100px,-100px);filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
-      #mf-ripple{position:fixed;z-index:2147483646;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
-        border:3px solid #2d45e6;pointer-events:none;opacity:0}
-      #mf-ripple.go{animation:mfr .5s ease-out}
-      @keyframes mfr{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(3.2)}}
-      #mf-cap{position:fixed;z-index:2147483647;left:50%;bottom:34px;transform:translate(-50%,14px);opacity:0;
-        padding:14px 26px;border-radius:16px;background:rgba(13,17,32,.86);color:#fff;
-        font:600 26px/1.2 Archivo,"Segoe UI",system-ui,sans-serif;letter-spacing:-.01em;white-space:nowrap;
-        transition:opacity .35s,transform .35s;box-shadow:0 12px 30px -10px rgba(0,0,0,.5)}
-      #mf-cap.on{opacity:1;transform:translate(-50%,0)}`;
+      #mf-cursor{position:fixed;z-index:2147483647;left:0;top:0;width:30px;height:30px;pointer-events:none;
+        transform:translate(-100px,-100px);filter:drop-shadow(0 3px 5px rgba(0,0,0,.4))}
+      #mf-ripple{position:fixed;z-index:2147483646;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
+        border:3px solid #8a9bff;pointer-events:none;opacity:0}
+      #mf-ripple.go{animation:mfr .55s ease-out}
+      @keyframes mfr{from{opacity:.9;transform:scale(.6)}to{opacity:0;transform:scale(3.4)}}`;
     document.head.appendChild(css);
+    if (window.top !== window) {
+      // The app inside the floating window: hold its drifting background still, so the film stays smooth.
+      const still = document.createElement('style');
+      still.textContent = 'body::before,body::after,html::before{animation:none!important}*{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}';
+      document.head.appendChild(still);
+    }
     cur = document.createElement('div'); cur.id = 'mf-cursor';
-    cur.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 2l15 9-6.5 1.6L9.4 19z" fill="#fff" stroke="#171c2e" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    cur.innerHTML = '<svg viewBox="0 0 24 24" width="30" height="30"><path d="M4 2l15 9-6.5 1.6L9.4 19z" fill="#fff" stroke="#171c2e" stroke-width="1.6" stroke-linejoin="round"/></svg>';
     rip = document.createElement('div'); rip.id = 'mf-ripple';
-    cap = document.createElement('div'); cap.id = 'mf-cap';
-    document.body.append(cur, rip, cap);
+    document.body.append(cur, rip);
     addEventListener('mousemove', (e) => { cur.style.transform = `translate(${e.clientX - 4}px,${e.clientY - 2}px)`; }, true);
     addEventListener('mousedown', (e) => {
       rip.style.left = e.clientX + 'px'; rip.style.top = e.clientY + 'px';
@@ -67,109 +82,86 @@ OVERLAY_JS = """
   else boot();
 })();
 """
+HIDE_CURSOR = "#mf-cursor{display:none!important}"
 
 
 class Film:
-    """Records a page as a list of timed JPEG frames, then encodes one MP4 for the scene."""
+    """Records a page as timed JPEG frames, then encodes one exact-length MP4 for the scene."""
 
-    def __init__(self, page, name):
-        self.page, self.name = page, name
-        self.frames = []
-        self.cdp = None
+    def __init__(self, page, name, length):
+        self.page, self.name, self.length = page, name, length
+        self.folder = WORK / name
+        self.folder.mkdir()
+        self.frames = []  # (timestamp, file)
+        self.t0 = 0.0
 
     async def start(self):
-        self.cdp = await self.page.context.new_cdp_session(self.page)
+        cdp = await self.page.context.new_cdp_session(self.page)
+        self.cdp = cdp
 
         async def on_frame(params):
-            self.frames.append(
-                (params["metadata"]["timestamp"], base64.b64decode(params["data"]))
-            )
-            await self.cdp.send(
-                "Page.screencastFrameAck", {"sessionId": params["sessionId"]}
-            )
+            index = len(self.frames)
+            path = self.folder / f"{index:05d}.jpg"
+            path.write_bytes(base64.b64decode(params["data"]))
+            self.frames.append((params["metadata"]["timestamp"], path))
+            await cdp.send("Page.screencastFrameAck", {"sessionId": params["sessionId"]})
 
-        self.cdp.on(
-            "Page.screencastFrame", lambda p: asyncio.ensure_future(on_frame(p))
-        )
-        await self.cdp.send(
+        cdp.on("Page.screencastFrame", lambda p: asyncio.ensure_future(on_frame(p)))
+        await cdp.send(
             "Page.startScreencast",
-            {
-                "format": "jpeg",
-                "quality": 92,
-                "maxWidth": W,
-                "maxHeight": H,
-                "everyNthFrame": 1,
-            },
+            {"format": "jpeg", "quality": 85, "maxWidth": W, "maxHeight": H, "everyNthFrame": 1},
         )
+        await asyncio.sleep(0.3)
+        await self.page.evaluate("document.body.classList.add('go')")
+        self.t0 = time.time()
 
-    async def stop(self, fade_in=0.0, fade_out=0.0):
-        end = time.time()
+    def log(self, label):
+        print(f"    {self.name} {time.time() - self.t0:5.2f}s  {label}")
+
+    async def at(self, secs):
+        """Wait until `secs` seconds after the scene's start."""
+        delay = self.t0 + secs - time.time()
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+    async def stop(self, fade_in=0.4, fade_out=0.45):
+        await self.at(self.length)
         await self.cdp.send("Page.stopScreencast")
         await asyncio.sleep(0.2)
-        folder = WORK / self.name
-        folder.mkdir()
+        end = self.t0 + self.length
+        before = [f for f in self.frames if f[0] <= self.t0]
+        kept = ([(self.t0, before[-1][1])] if before else []) + [
+            f for f in self.frames if self.t0 < f[0] < end
+        ]
         lines = []
-        for i, (t, data) in enumerate(self.frames):
-            (folder / f"{i:05d}.jpg").write_bytes(data)
-            nxt = (
-                self.frames[i + 1][0]
-                if i + 1 < len(self.frames)
-                else max(end, t + 0.04)
-            )
-            lines.append(
-                f"file '{folder / f'{i:05d}.jpg'}'\nduration {max(nxt - t, 0.001):.4f}"
-            )
-        lines.append(f"file '{folder / f'{len(self.frames) - 1:05d}.jpg'}'")
-        listing = folder / "list.txt"
+        for i, (t, path) in enumerate(kept):
+            nxt = kept[i + 1][0] if i + 1 < len(kept) else end
+            lines.append(f"file '{path}'\nduration {max(nxt - t, 0.001):.4f}")
+        lines.append(f"file '{kept[-1][1]}'")
+        listing = self.folder / "list.txt"
         listing.write_text("\n".join(lines))
-        seconds = self.frames[-1][0] - self.frames[0][0] + 0.04
-        filters = [f"fps={FPS}", f"scale={W}:{H}:flags=lanczos", "format=yuv420p"]
-        if fade_in:
-            filters.append(f"fade=t=in:st=0:d={fade_in}:color=0d1120")
-        if fade_out:
-            filters.append(
-                f"fade=t=out:st={max(seconds - fade_out, 0):.2f}:d={fade_out}:color=0d1120"
-            )
+        filters = [
+            f"fps={FPS}",
+            "format=yuv420p",
+            f"fade=t=in:st=0:d={fade_in}:color=0x{STAGE_BG}",
+            f"fade=t=out:st={self.length - fade_out:.3f}:d={fade_out}:color=0x{STAGE_BG}",
+        ]
         target = WORK / f"{self.name}.mp4"
         temp = WORK / f"{self.name}.part.mp4"
         subprocess.run(
-            [
-                "ffmpeg",
-                "-v",
-                "error",
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                str(listing),
-                "-vf",
-                ",".join(filters),
-                "-c:v",
-                "libx264",
-                "-crf",
-                "18",
-                "-preset",
-                "veryfast",
-                "-pix_fmt",
-                "yuv420p",
-                "-r",
-                str(FPS),
-                "-an",
-                str(temp),
-            ],
+            ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
+             "-vf", ",".join(filters), "-t", f"{self.length:.4f}", "-c:v", "libx264", "-crf", "20",
+             "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", str(FPS), "-an", str(temp)],
             check=True,
         )
         temp.rename(target)
-        print(f"scene {self.name}: {len(self.frames)} frames, {seconds:.1f}s")
+        early = len([f for f in kept if f[0] < self.t0 + 1.5])
+        print(f"scene {self.name}: {len(kept)} frames, {self.length:.2f}s ({early} in the first 1.5 s)")
         return target
 
 
-async def glide(page, x, y, steps=28, pause=0.0):
+async def glide(page, x, y, steps=10):
     await page.mouse.move(x, y, steps=steps)
-    if pause:
-        await asyncio.sleep(pause)
 
 
 async def centre(locator):
@@ -177,175 +169,194 @@ async def centre(locator):
     return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
 
 
-async def click(page, locator, steps=16, pause=0.25):
+async def click(page, locator, steps=10, pause=0.15):
     x, y = await centre(locator)
-    await glide(page, x, y, steps=steps, pause=0.1)
+    await glide(page, x, y, steps=steps)
+    await asyncio.sleep(0.1)
     await page.mouse.down()
-    await asyncio.sleep(0.08)
+    await asyncio.sleep(0.07)
     await page.mouse.up()
     await asyncio.sleep(pause)
 
 
-async def caption(page, text, hold):
-    await page.evaluate("(t) => window.__cap(t)", text)
-    await asyncio.sleep(hold)
-
-
-def slow_download(
-    url,
-    fmt,
-    quality,
-    workdir,
-    extra=None,
-    notes=None,
-    mute=False,
-    progress=None,
-    features=None,
-):
-    """A stand-in download that takes a few seconds, so the progress bar is visible."""
+def slow_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False,
+                  progress=None, features=None):
+    """A stand-in download that takes a couple of seconds, so the progress bar can be seen."""
     for percent in range(0, 101, 5):
         if progress:
-            progress(
-                {
-                    "phase": "downloading",
-                    "percent": float(percent),
-                    "speed": 3.1e6,
-                    "eta": 2,
-                }
-            )
-        time.sleep(0.11)
+            progress({"phase": "downloading", "percent": float(percent), "speed": 3.1e6, "eta": 2})
+        time.sleep(0.1)
     out = Path(workdir) / f"Sample Song (Official Video).{fmt}"
     out.write_bytes(b"x" * 2048)
     return out
 
 
-async def scene_page(browser, base, thumb, scheme="light", path=None, cursor=True):
+async def open_page(browser, thumb, path, cursor=False):
     context = await browser.new_context(
-        viewport={"width": W, "height": H}, color_scheme=scheme, device_scale_factor=1
+        viewport={"width": W, "height": H}, color_scheme="dark", device_scale_factor=1
     )
     await context.add_init_script(OVERLAY_JS)
-    await context.route(
-        "**/guide-thumb.png", lambda r: r.fulfill(body=thumb, content_type="image/png")
-    )
+    await context.route("**/guide-thumb.png", lambda r: r.fulfill(body=thumb, content_type="image/png"))
     page = await context.new_page()
-    await page.goto(path or base)
+    await page.goto(path)
     if not cursor:
-        await page.add_style_tag(content="#mf-cursor{display:none!important}")
+        await page.add_style_tag(content=HIDE_CURSOR)
     return context, page
+
+
+def card_url(name):
+    from urllib.parse import quote
+
+    title, sub = CARDS[name]
+    return (PROMO / "card.html").as_uri() + f"?t={quote(title)}&s={quote(sub)}"
+
+
+async def show_for_setup(page):
+    """Show the stage while the scene is being set up (the page needs to be visible to click)."""
+    await page.evaluate("document.body.classList.add('go')")
+    await asyncio.sleep(2.2)
+
+
+async def hide_after_setup(page):
+    """Back to the hidden start, so the window rises into view when the film starts."""
+    await page.evaluate("document.body.classList.remove('go')")
+    await asyncio.sleep(0.3)
+
+
+async def silent_preview(frame):
+    """Fill the link and press Preview without anyone watching, so a scene can start from there."""
+    await frame.locator("#url-input").fill(URL)
+    await frame.locator("#preview-btn").click()
+    await frame.locator("#preview:not([hidden])").wait_for()
+    await asyncio.sleep(0.5)
 
 
 async def make_scenes(base):
     from playwright.async_api import async_playwright
 
     thumb = guide._thumbnail()
+    stage = (PROMO / "stage.html").as_uri() + f"?app={base}"
     scenes = []
+
+    async def static(browser, name, path):
+        context, page = await open_page(browser, thumb, path)
+        film = Film(page, name, seconds(name))
+        await film.start()
+        scenes.append(await film.stop())
+        await context.close()
+
     async with async_playwright() as p:
         browser = await p.chromium.launch()
 
-        # 1. Title card.
-        context, page = await scene_page(
-            browser, base, thumb, "dark", (PROMO / "title.html").as_uri(), cursor=False
+        await static(browser, "intro", (PROMO / "intro.html").as_uri())
+        await static(browser, "c1", card_url("c1"))
+
+        # Paste a link and preview it.
+        context, page = await open_page(browser, thumb, stage)
+        app = page.frame_locator("#f1")
+        await app.locator(".chip").first.wait_for()
+        await asyncio.sleep(1.0)
+        film = Film(page, "ui1", seconds("ui1"))
+        await film.start()
+        await film.at(1.6)
+        await click(page, app.locator("#url-input"))
+        film.log("typing")
+        await page.keyboard.type(URL, delay=26)
+        film.log("typed")
+        await film.at(3.3)
+        await click(page, app.locator("#preview-btn"))
+        await app.locator("#preview:not([hidden])").wait_for()
+        film.log("preview shown")
+        await film.at(4.4)
+        await app.locator("#preview").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
+        scenes.append(await film.stop())
+        await context.close()
+
+        await static(browser, "c2", card_url("c2"))
+
+        # Choose a format and convert.
+        context, page = await open_page(browser, thumb, stage)
+        app = page.frame_locator("#f1")
+        await show_for_setup(page)
+        await app.locator(".chip").first.wait_for()
+        await silent_preview(app)
+        await app.locator("#format-chips").evaluate("e => e.scrollIntoView({block:'center'})")
+        await asyncio.sleep(0.6)
+        await hide_after_setup(page)
+        film = Film(page, "ui2", seconds("ui2"))
+        await film.start()
+        await film.at(1.5)
+        await click(page, app.locator("#format-chips .chip").nth(3))
+        film.log("format chosen")
+        await film.at(2.4)
+        await app.locator("#submit-btn").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
+        await film.at(3.0)
+        await click(page, app.locator("#submit-btn"), pause=0.1)
+        film.log("convert clicked")
+        await app.locator("#status.is-success").wait_for(timeout=20000)
+        film.log("success")
+        scenes.append(await film.stop())
+        await context.close()
+
+        await static(browser, "c3", card_url("c3"))
+
+        # A file and the spatial sound tweak.
+        context, page = await open_page(browser, thumb, stage)
+        app = page.frame_locator("#f1")
+        await show_for_setup(page)
+        await app.locator(".chip").first.wait_for()
+        await app.locator("#tab-file").click()
+        await app.locator("#file-input").set_input_files(
+            {"name": "Holiday-clip.mp4", "mimeType": "video/mp4", "buffer": b"\x00" * 4096}
         )
-        film = Film(page, "1-title")
-        await film.start()
-        await asyncio.sleep(3.6)
-        scenes.append(await film.stop(fade_out=0.3))
-        await context.close()
-
-        # 2. Paste a link, preview, pick MP3, convert.
-        context, page = await scene_page(browser, base, thumb)
-        await page.wait_for_selector(".chip")
-        await page.evaluate("document.querySelector('.site-header').scrollIntoView()")
-        await page.wait_for_timeout(600)
-        film = Film(page, "2-convert")
-        await film.start()
-        await asyncio.sleep(0.6)
-        await caption(page, "Paste a link", 0.3)
-        await click(page, page.locator("#url-input"))
-        await page.keyboard.type(URL, delay=38)
-        await asyncio.sleep(0.4)
-        await click(page, page.locator("#preview-btn"))
-        await page.wait_for_selector("#preview:not([hidden])")
-        await page.evaluate("window.scrollTo({top: 250, behavior: 'smooth'})")
-        await asyncio.sleep(0.9)
-        await caption(page, "Choose a format", 0.3)
-        await click(page, page.locator("#format-chips .chip").nth(0))
-        await asyncio.sleep(0.6)
-        await page.evaluate("window.scrollTo({top: 560, behavior: 'smooth'})")
+        await app.locator("#tweaks").wait_for(state="visible")
         await asyncio.sleep(0.8)
-        await caption(page, "Convert and download", 0.3)
-        await click(page, page.locator("#submit-btn"), pause=0.2)
-        await page.wait_for_selector("#status.is-success", timeout=20000)
-        await asyncio.sleep(1.6)
-        scenes.append(await film.stop(fade_in=0.3, fade_out=0.25))
-        await context.close()
-
-        # 3. A local file, and the spatial sound tweak.
-        context, page = await scene_page(browser, base, thumb)
-        await page.wait_for_selector(".chip")
-        await page.wait_for_timeout(1200)
-        film = Film(page, "3-tweaks")
-        await film.start()
+        await app.locator("#tweaks").evaluate("e => e.scrollIntoView({block:'center'})")
         await asyncio.sleep(0.5)
-        await caption(page, "Or choose a file from your computer", 0.2)
-        await click(page, page.locator("#tab-file"))
-        await page.set_input_files(
-            "#file-input",
-            {
-                "name": "Holiday-clip.mp4",
-                "mimeType": "video/mp4",
-                "buffer": b"\x00" * 4096,
-            },
-        )
-        await asyncio.sleep(0.6)
-        await page.evaluate("window.scrollTo({top: 420, behavior: 'smooth'})")
-        await asyncio.sleep(0.8)
-        await click(page, page.locator("#tweaks > summary"))
-        await page.evaluate(
-            "document.querySelector('#tw-spatial').scrollIntoView({block:'center', behavior:'smooth'})"
-        )
-        await asyncio.sleep(0.9)
-        await caption(page, "Tweak the sound, even spatial audio for headphones", 0.3)
-        await click(page, page.locator("#tw-spatial"), pause=0.2)
-        await page.select_option("#tw-spatial", "orbit")
-        await asyncio.sleep(1.5)
-        scenes.append(await film.stop(fade_in=0.3, fade_out=0.25))
+        await hide_after_setup(page)
+        film = Film(page, "ui3", seconds("ui3"))
+        await film.start()
+        await film.at(1.5)
+        await click(page, app.locator("#tweaks > summary"))
+        film.log("tweaks opened")
+        await app.locator("#tw-spatial").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
+        await film.at(3.0)
+        await click(page, app.locator("#tw-spatial"), pause=0.1)
+        await app.locator("#tw-spatial").select_option("orbit")
+        film.log("orbit chosen")
+        scenes.append(await film.stop())
         await context.close()
 
-        # 4. The phone, in the dark theme.
-        context, page = await scene_page(
-            browser,
-            base,
-            thumb,
-            "dark",
-            (PROMO / "phone.html").as_uri() + f"?app={base}",
-            cursor=False,
-        )
-        frame = page.frame_locator("#app")
-        await frame.locator(".chip").first.wait_for()
-        await asyncio.sleep(1.4)
-        film = Film(page, "4-phone")
+        await static(browser, "c4", card_url("c4"))
+
+        # Desktop, tablet and phone, side by side.
+        context, page = await open_page(browser, thumb, stage + "&mode=devices")
+        await show_for_setup(page)
+        for frame_id in ("#f1", "#f2"):
+            frame = page.frame_locator(frame_id)
+            await frame.locator(".chip").first.wait_for()
+            await silent_preview(frame)
+        for handle in page.frames[1:3]:
+            await handle.evaluate(
+                "css => document.head.append(Object.assign(document.createElement('style'), {textContent: css}))",
+                HIDE_CURSOR,
+            )
+        phone = page.frame_locator("#f3")
+        await phone.locator(".chip").first.wait_for()
+        await hide_after_setup(page)
+        film = Film(page, "phone", seconds("phone"))
         await film.start()
-        await asyncio.sleep(0.5)
-        await click(page, frame.locator("#url-input"))
-        await page.keyboard.type(URL, delay=34)
-        await click(page, frame.locator("#preview-btn"))
-        await frame.locator("#preview:not([hidden])").wait_for()
-        await asyncio.sleep(0.8)
-        await page.mouse.wheel(0, 330)
-        await asyncio.sleep(2.0)
-        scenes.append(await film.stop(fade_in=0.3, fade_out=0.25))
+        await film.at(1.8)
+        await click(page, phone.locator("#url-input"))
+        await page.keyboard.type(URL, delay=12)
+        film.log("typed")
+        await film.at(2.9)
+        await click(page, phone.locator("#preview-btn"))
+        film.log("preview clicked")
+        scenes.append(await film.stop())
         await context.close()
 
-        # 5. End card.
-        context, page = await scene_page(
-            browser, base, thumb, "dark", (PROMO / "end.html").as_uri(), cursor=False
-        )
-        film = Film(page, "5-end")
-        await film.start()
-        await asyncio.sleep(3.6)
-        scenes.append(await film.stop(fade_in=0.3, fade_out=0.6))
-        await context.close()
+        await static(browser, "end", (PROMO / "end.html").as_uri())
         await browser.close()
     return scenes
 
@@ -354,50 +365,34 @@ def join(scenes):
     OUT.mkdir(parents=True, exist_ok=True)
     listing = WORK / "scenes.txt"
     listing.write_text("".join(f"file '{s}'\n" for s in scenes))
+    silent = WORK / "silent.mp4"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
+         "-c", "copy", str(silent)],
+        check=True,
+    )
+    wav = WORK / "score.wav"
+    from scipy.io import wavfile
+
+    import numpy as np
+
+    wavfile.write(wav, score.SR, (score.compose() * 32767).astype(np.int16))
     temp = OUT / "promo.part.mp4"
     subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(listing),
-            "-c",
-            "copy",
-            "-movflags",
-            "+faststart",
-            str(temp),
-        ],
+        ["ffmpeg", "-v", "error", "-y", "-i", str(silent), "-i", str(wav), "-map", "0:v", "-map", "1:a",
+         "-c:v", "copy", "-af", "loudnorm=I=-18:TP=-2:LRA=7", "-c:a", "aac", "-b:a", "192k",
+         "-ar", "44100", "-shortest", "-movflags", "+faststart", str(temp)],
         check=True,
     )
     temp.rename(OUT / "promo.mp4")
-    # The poster is a still from the title card: clean, and it works as a share image too.
+    # Poster and share image: the opening, once the name and the line are both on screen.
     subprocess.run(
-        [
-            "ffmpeg",
-            "-v",
-            "error",
-            "-y",
-            "-ss",
-            "2.3",
-            "-i",
-            str(OUT / "promo.mp4"),
-            "-frames:v",
-            "1",
-            "-q:v",
-            "3",
-            str(OUT / "poster.jpg"),
-        ],
+        ["ffmpeg", "-v", "error", "-y", "-ss", "3.9", "-i", str(OUT / "promo.mp4"), "-frames:v", "1",
+         "-vf", "scale=1280:-1", "-q:v", "3", str(OUT / "poster.jpg")],
         check=True,
     )
-    # The share image for links on social sites and chat apps: 1200 x 630.
     subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-i", str(OUT / "poster.jpg"),
+        ["ffmpeg", "-v", "error", "-y", "-ss", "3.9", "-i", str(OUT / "promo.mp4"), "-frames:v", "1",
          "-vf", "scale=1200:-1,crop=1200:630", "-q:v", "3", str(OUT / "og.jpg")],
         check=True,
     )
