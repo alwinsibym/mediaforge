@@ -6,6 +6,10 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Wide film-style videos are named the way the site names them. A 3840 x 1608 video now shows as 2160p (4K) instead of 1608p, a 2560 x 1072 one as 1440p (2K) instead of 1072p, and a 1920 x 804 one as 1080p. The download itself was never limited; only the label was misleading.
+
 ## [1.5.1] - 2026-11-23
 
 ### Changed
