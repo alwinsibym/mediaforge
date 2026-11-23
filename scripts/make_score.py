@@ -1,11 +1,11 @@
-"""Compose the background score for the promo video: an original, synthesised piece.
+"""Compose the background score for the promo video: an original, synthesised piece for felt piano.
 
     python scripts/make_score.py [output.wav]
 
-It is made entirely from sine and noise sources in numpy, so there is nothing to license.
-96 beats per minute, 110 beats (about 69 seconds), in C major: a warm pad, a soft sub bass, glassy
-bell notes with a ping-pong echo, and a quiet heartbeat kick with a light rim and hat. The beat
-numbers of the video's scenes are in SCENES below, so the picture and the music change together.
+Everything is made from sine and noise sources in numpy, so there is nothing to license.
+96 beats per minute, 110 beats (about 69 seconds), in C major: a soft felt piano that plays a
+slow pattern over a warm low pad, with no drums until the very end. The beat numbers of the
+video's scenes are in SCENES below, so the picture and the music change together.
 """
 
 import sys
@@ -25,13 +25,14 @@ LENGTH = TOTAL_BEATS * BEAT  # 68.75 s
 SCENES = {"intro": 0, "what": 8, "pipe": 16, "demo": 28, "tweaks": 48, "spatial": 60,
           "local": 72, "phone": 80, "get": 90, "end": 98}
 
-C9 = [48, 55, 59, 62, 64]
-AM9 = [45, 52, 55, 59, 60]
-F9 = [41, 48, 52, 57, 60]
-G69 = [43, 50, 52, 57, 59]
+# Chord tones from the bottom up: root, fifth, seventh, ninth, third (C9, Am9, F9, G6/9).
+C9 = [36, 43, 47, 50, 52]
+AM9 = [33, 40, 43, 47, 48]
+F9 = [29, 36, 40, 45, 48]
+G69 = [31, 38, 40, 45, 47]
 CHORDS = [(0, C9), (8, AM9), (16, F9), (24, G69), (32, C9), (40, AM9), (48, F9), (56, G69),
           (64, C9), (72, AM9), (80, F9), (88, G69), (98, C9)]
-FINAL = 98  # the closing chord and the last flourish
+FINAL = 98  # the closing chord
 
 rng = np.random.default_rng(7)
 
@@ -63,164 +64,137 @@ def highpass(x, cutoff, order=2):
     return signal.sosfilt(signal.butter(order, cutoff, "high", fs=SR, output="sos"), x)
 
 
-def pad_note(midi, seconds, attack=1.5, release=1.8):
+def piano(midi, vel=0.7, seconds=4.5):
+    """A felt piano note: slightly stretched partials that fade at their own pace, two strings,
+    and a soft thump from the hammer. Quiet notes are rounder, louder ones a little brighter."""
+    t = np.arange(int(seconds * SR)) / SR
+    f = hz(midi)
+    tone = np.zeros_like(t)
+    decay = 3.2 * (60 / max(midi, 30)) ** 0.7  # low notes ring longer
+    for n in range(1, 11):
+        fn = f * n * np.sqrt(1 + 0.00035 * n * n)
+        if fn > 7000:
+            break
+        weight = (1 / n ** 1.25) * (vel ** (0.5 * (n - 1)) if n > 1 else 1.0)
+        env = np.exp(-t / (decay / (1 + 0.55 * (n - 1))))
+        for cents, share in ((-1.6, 0.5), (1.6, 0.5)):
+            tone += share * weight * np.sin(2 * np.pi * fn * 2 ** (cents / 1200) * t + n) * env
+    thump = lowpass(rng.standard_normal(len(t)), 700) * np.exp(-t / 0.018) * 0.5 * vel
+    attack = np.minimum(t / 0.004, 1.0)
+    out = lowpass((tone + thump * 0.25) * attack, 4800)
+    out *= np.where(t > seconds - 0.8, np.clip((seconds - t) / 0.8, 0, 1), 1.0)
+    return out * 0.22 * vel
+
+
+def pad_note(midi, seconds, attack=2.0, release=2.2):
     t = np.arange(int((seconds + release) * SR)) / SR
     f = hz(midi)
     tone = np.zeros_like(t)
-    for cents, weight in ((-5, 0.5), (0, 1.0), (5, 0.5)):
+    for cents, weight in ((-6, 0.5), (0, 1.0), (6, 0.5)):
         ff = f * 2 ** (cents / 1200)
-        tone += weight * (np.sin(2 * np.pi * ff * t) + 0.35 * np.sin(2 * np.pi * 2 * ff * t)
-                          + 0.12 * np.sin(2 * np.pi * 3 * ff * t))
+        tone += weight * (np.sin(2 * np.pi * ff * t) + 0.25 * np.sin(2 * np.pi * 2 * ff * t))
     env = np.minimum(t / attack, 1.0) ** 2
     env *= np.where(t > seconds, np.clip(1 - (t - seconds) / release, 0, 1) ** 2, 1.0)
-    return lowpass(tone * env, 1400) * 0.05
+    return lowpass(tone * env, 900) * 0.045
 
 
-def bass_note(midi, seconds):
-    t = np.arange(int((seconds + 0.4) * SR)) / SR
-    env = np.minimum(t / 0.06, 1.0) * np.exp(-t / 2.2)
-    env *= np.where(t > seconds, np.clip(1 - (t - seconds) / 0.4, 0, 1), 1.0)
-    return (np.sin(2 * np.pi * hz(midi) * t) + 0.15 * np.sin(4 * np.pi * hz(midi) * t)) * env * 0.26
+def sub_note(midi, seconds):
+    t = np.arange(int((seconds + 0.6) * SR)) / SR
+    env = np.minimum(t / 0.25, 1.0) * np.exp(-t / 3.0)
+    env *= np.where(t > seconds, np.clip(1 - (t - seconds) / 0.6, 0, 1), 1.0)
+    return np.sin(2 * np.pi * hz(midi) * t) * env * 0.2
 
 
-def bell(midi, vel=1.0, seconds=3.0):
-    t = np.arange(int(seconds * SR)) / SR
-    f = hz(midi)
-    index = 2.2 * np.exp(-t / 0.35)
-    tone = np.sin(2 * np.pi * f * t + index * np.sin(2 * np.pi * f * 3.5 * t))
-    tone += 0.28 * np.sin(2 * np.pi * f * 2 * t) * np.exp(-t / 0.5)
-    env = np.minimum(t / 0.004, 1.0) * np.exp(-t / 0.9)
-    return tone * env * 0.1 * vel
-
-
-def kick(vel=1.0):
-    t = np.arange(int(0.5 * SR)) / SR
-    freq = 46 + 70 * np.exp(-t / 0.035)
+def heart(vel=1.0):
+    """A soft, low pulse, used only for the closing."""
+    t = np.arange(int(0.6 * SR)) / SR
+    freq = 44 + 50 * np.exp(-t / 0.05)
     phase = 2 * np.pi * np.cumsum(freq) / SR
-    return np.sin(phase) * np.exp(-t / 0.15) * np.minimum(t / 0.003, 1.0) * 0.55 * vel
+    return np.sin(phase) * np.exp(-t / 0.2) * np.minimum(t / 0.006, 1.0) * 0.4 * vel
 
 
-def rim(vel=1.0):
-    t = np.arange(int(0.12 * SR)) / SR
-    noise = signal.sosfilt(signal.butter(2, [1500, 3200], "band", fs=SR, output="sos"), rng.standard_normal(len(t)))
-    return noise * np.exp(-t / 0.025) * 0.16 * vel
-
-
-def hat(vel=1.0):
-    t = np.arange(int(0.07 * SR)) / SR
-    return highpass(rng.standard_normal(len(t)), 7500) * np.exp(-t / 0.014) * 0.05 * vel
-
-
-def riser(seconds):
-    n = int(seconds * SR)
-    t = np.linspace(0, 1, n)
-    noise = rng.standard_normal(n)
-    out = np.zeros(n)
-    step = 2048
-    for s in range(0, n, step):
-        cutoff = 400 * (1 + 20 * (s / n) ** 2)
-        out[s:s + step] = lowpass(noise[s:s + step], min(cutoff, 14000), 1)
-    return out * (t ** 2.2) * 0.22
-
-
-def reverb_ir(seconds=3.4):
+def reverb_ir(seconds=3.8):
     n = int(seconds * SR)
     t = np.arange(n) / SR
     ir = np.stack([rng.standard_normal(n), rng.standard_normal(n)], axis=1)
     ir *= np.exp(-t / (seconds / 6.9))[:, None]  # about 60 dB down at the end
-    ir[:, 0], ir[:, 1] = lowpass(highpass(ir[:, 0], 180), 5500), lowpass(highpass(ir[:, 1], 180), 5500)
-    ir[: int(0.012 * SR)] *= np.linspace(0, 1, int(0.012 * SR))[:, None]
+    ir[:, 0], ir[:, 1] = lowpass(highpass(ir[:, 0], 160), 5000), lowpass(highpass(ir[:, 1], 160), 5000)
+    ir[: int(0.015 * SR)] *= np.linspace(0, 1, int(0.015 * SR))[:, None]
     return ir / np.sqrt(np.sum(ir ** 2))
 
 
 def echo(track, delay, feedback, mix):
     d = int(delay * SR)
     out = track.copy()
-    for k in range(1, 6):
+    for k in range(1, 5):
         shifted = np.zeros_like(track)
         shifted[k * d:] = track[: len(track) - k * d][:, ::-1] * (feedback ** k)  # swap sides
         out += shifted * mix
     return out
 
 
-def arpeggio_notes(chord, b):
-    """Which bell notes play in beat `b`, as (offset in beats, midi, velocity)."""
-    top = [chord[2] + 24, chord[3] + 24, chord[4] + 24, chord[1] + 24, chord[3] + 12]
-    notes = []
-    if b < 4 or b >= 94:  # the riser and the closing chord are left clear
-        return notes
-    dense = 16 <= b < 72 or 80 <= b < 94
-    sparse = not dense
-    for half in (0, 1):
-        n = (b * 2 + half)
-        if sparse and half == 1:
-            continue
-        pick = top[(n * 3 + n // 4) % len(top)]
-        vel = (0.55 if dense else 0.42) * (1.0 if half == 0 else 0.7)
-        notes.append((half * 0.5, pick, vel))
-    return notes
+def chord_at(b):
+    return max((c for c in CHORDS if c[0] <= b), key=lambda c: c[0])[1]
 
 
 def compose():
-    pads, bells, drums = buf(), buf(), buf()
+    pads, keys = buf(), buf()
 
-    # Pad and bass follow the chords.
-    for i, (start_beat, chord) in enumerate(CHORDS):
-        end_beat = CHORDS[i + 1][0] if i + 1 < len(CHORDS) else TOTAL_BEATS
-        seconds = (end_beat - start_beat) * BEAT
-        big = start_beat == FINAL
-        for k, midi in enumerate(chord):
-            put(pads, pad_note(midi, seconds, attack=0.9 if big else 1.5) * (1.5 if big else 1.0),
-                start_beat * BEAT, pan=(k - 2) * 0.18)
-        if start_beat >= 8:
-            put(pads, bass_note(chord[0] - 12 + 12, 4 * BEAT), start_beat * BEAT)
-            if end_beat - start_beat >= 8:
-                put(pads, bass_note(chord[0], 3 * BEAT), (start_beat + 4) * BEAT)
+    # A low pad and a soft sub note under each chord.
+    for i, (start, chord) in enumerate(CHORDS):
+        end = CHORDS[i + 1][0] if i + 1 < len(CHORDS) else TOTAL_BEATS
+        seconds = (end - start) * BEAT
+        big = start == FINAL
+        for k, midi in enumerate(chord[1:], start=1):
+            put(pads, pad_note(midi + 12, seconds, attack=1.0 if big else 2.0) * (1.6 if big else 1.0),
+                start * BEAT, pan=(k - 2) * 0.2)
+        if start >= 8:
+            put(pads, sub_note(chord[0], seconds), start * BEAT)
 
-    # Bells: a few long notes in the opening, then a light arpeggio, plus a bell on each title.
-    chord_at = lambda b: max((c for c in CHORDS if c[0] <= b), key=lambda c: c[0])[1]  # noqa: E731
+    # Piano. Each bar is a low note, then a slow rising and falling pattern in the middle register.
+    pattern = [0, 2, 3, 2, 1, 3, 4, 3]  # indices into the chord, one per beat
     for b in range(TOTAL_BEATS):
         chord = chord_at(b)
-        for offset, midi, vel in arpeggio_notes(chord, b):
-            put(bells, bell(midi, vel), (b + offset) * BEAT, pan=0.35 if int(b * 2 + offset * 2) % 2 else -0.35)
-    for beat, midi in ((0, 79), (2.5, 76), (5, 84)):  # the logo
-        put(bells, bell(midi, 0.9, 4.0), beat * BEAT, pan=0.15)
-    for k, name in enumerate(("what", "pipe", "tweaks", "spatial", "local", "get")):
-        put(bells, bell(83 if k % 2 == 0 else 79, 1.0, 3.5), SCENES[name] * BEAT, pan=-0.1)  # one clear note per headline
-    for k, midi in enumerate((72, 76, 79, 83, 88)):  # the closing flourish
-        put(bells, bell(midi, 0.95, 4.5), (FINAL + k * 0.5) * BEAT, pan=(k - 2) * 0.2)
-    bells = echo(bells, BEAT * 0.75, 0.38, 0.55)
-
-    # The beat: quiet and soft, building a little, easing off, and dropping away at the end.
-    for b in range(8, 94):
-        full = 16 <= b < 72 or 80 <= b < 94
-        if not full:
-            if b % 2 == 0:
-                put(drums, kick(0.7), b * BEAT)
+        if b < 4 or b >= 94:
             continue
-        if b % 2 == 0 and full:
-            put(drums, kick(0.85 if b % 4 == 0 else 0.7), b * BEAT)
-        if b % 4 in (1, 3) and full:
-            put(drums, rim(0.8), b * BEAT, pan=0.1)
-        if full:
-            put(drums, hat(0.7), (b + 0.5) * BEAT, pan=-0.15)
-            if b % 2 == 1:
-                put(drums, hat(0.5), b * BEAT, pan=0.15)
-    put(drums, kick(1.15), FINAL * BEAT)
-    put(drums, riser(4 * BEAT), 94 * BEAT)
+        dense = 16 <= b < 72 or 80 <= b < 94
+        beat_in_bar = b % 8
+        if beat_in_bar == 0:
+            put(keys, piano(chord[0] + 12, 0.62, 5.5), b * BEAT, pan=-0.1)
+        if dense:
+            midi = chord[pattern[beat_in_bar]] + 24
+            put(keys, piano(midi, 0.55 if beat_in_bar else 0.65, 4.0), b * BEAT, pan=0.25 * (1 if b % 2 else -1))
+            if beat_in_bar in (2, 6):  # a quiet echo of the pattern, half a beat later
+                put(keys, piano(chord[(pattern[beat_in_bar] + 2) % 5] + 36, 0.4, 3.0), (b + 0.5) * BEAT, pan=0.3)
+        elif beat_in_bar in (2, 5):
+            put(keys, piano(chord[(beat_in_bar // 2) % 5] + 24, 0.5, 4.0), b * BEAT, pan=0.15)
 
-    # Space around the pad and the bells.
+    # The opening: three slow, high notes for the logo.
+    for beat, midi in ((0, 76), (2.5, 79), (5, 84)):
+        put(keys, piano(midi, 0.7, 5.0), beat * BEAT, pan=0.1)
+    # One clear high note as each headline arrives.
+    for k, name in enumerate(("what", "pipe", "tweaks", "spatial", "local", "get")):
+        put(keys, piano(88 if k % 2 == 0 else 84, 0.62, 4.0), SCENES[name] * BEAT, pan=-0.1)
+    # The closing: a rolled chord, a soft low pulse and a final high note.
+    for k, midi in enumerate((48, 55, 59, 64, 67, 71, 76)):
+        put(keys, piano(midi, 0.7, 6.0), (FINAL + k * 0.35) * BEAT, pan=(k - 3) * 0.12)
+    for k in range(0, 8, 2):
+        put(pads, heart(0.7 if k else 1.0), (FINAL + k) * BEAT)
+    put(keys, piano(88, 0.55, 6.0), (FINAL + 5) * BEAT, pan=0.2)
+
+    keys = echo(keys, BEAT * 1.5, 0.3, 0.35)
+
+    # Space around everything.
     ir = reverb_ir()
-    wet = np.stack([signal.fftconvolve(pads[:, c] + bells[:, c] * 0.8, ir[:, c])[: len(pads)]
-                    for c in range(2)], axis=1)
-    mix = pads * 0.9 + bells * 0.85 + wet * 0.55 + drums
+    wet = np.stack([signal.fftconvolve(pads[:, c] + keys[:, c], ir[:, c])[: len(pads)] for c in range(2)], axis=1)
+    mix = pads * 0.9 + keys * 0.9 + wet * 0.6
 
     mix = mix[: int(LENGTH * SR)]
-    fade = int(3.0 * SR)
+    fade = int(3.5 * SR)
     mix[-fade:] *= (np.linspace(1, 0, fade) ** 1.6)[:, None]
     mix[: int(0.05 * SR)] *= np.linspace(0, 1, int(0.05 * SR))[:, None]
     mix = highpass(mix.T, 28, 2).T
-    mix = np.tanh(mix * 1.15) / np.tanh(1.15)  # soft clip, so no sharp peaks
+    mix = np.tanh(mix * 1.1) / np.tanh(1.1)  # soft clip, so no sharp peaks
     return mix / max(np.abs(mix).max(), 1e-9) * 0.9
 
 
