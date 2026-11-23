@@ -133,6 +133,36 @@ def echo(track, delay, feedback, mix):
     return out
 
 
+ORBIT_START = 1.4  # seconds into the spatial scene when the dot starts to circle (promo/spatial.html)
+ORBIT_PERIOD = 4.2  # seconds for one full turn, the same as the dot's spin in promo/spatial.html
+MOVER_GAIN = 2.6  # the travelling layer sits a little above the rest, so the motion can be heard
+
+
+def spatialize(mono, t0):
+    """Place a mono sound on a circle around the listener's head, turning once every ORBIT_PERIOD
+    seconds from t0 (front, then right, behind, left, like the dot in the picture).
+    Sideways position is a pan and a tiny delay between the ears. Behind the head, the sound is
+    a little duller and quieter."""
+    n = len(mono)
+    idx = np.arange(n)
+    theta = 2 * np.pi * np.maximum(idx / SR - t0, 0) / ORBIT_PERIOD
+    side, front = np.sin(theta), np.cos(theta)
+    dull = lowpass(mono, 1300)
+    src = (mono * (0.5 + 0.5 * front) + dull * (0.5 - 0.5 * front)) * (0.82 + 0.18 * front)
+    gl, gr = np.sqrt(0.5 * (1 - 0.92 * side)), np.sqrt(0.5 * (1 + 0.92 * side))
+    delay = 0.0006 * SR  # the far ear hears it about 0.6 ms later
+    left = np.interp(idx - delay * np.maximum(side, 0), idx, src) * gl
+    right = np.interp(idx - delay * np.maximum(-side, 0), idx, src) * gr
+    return np.stack([left, right], axis=1)
+
+
+def whoosh(seconds):
+    """A soft breath of air that swells and fades."""
+    t = np.linspace(0, 1, int(seconds * SR))
+    noise = highpass(lowpass(rng.standard_normal(len(t)), 3200), 500)
+    return noise * np.sin(np.pi * t) ** 2 * 0.05
+
+
 def chord_at(b):
     return max((c for c in CHORDS if c[0] <= b), key=lambda c: c[0])[1]
 
@@ -183,6 +213,41 @@ def compose():
     put(keys, piano(88, 0.55, 6.0), (FINAL + 5) * BEAT, pan=0.2)
 
     keys = echo(keys, BEAT * 1.5, 0.3, 0.35)
+
+    # The spatial scene: a few high notes and breaths of air travel around the listener, in step
+    # with the dot that circles on screen.
+    start = SCENES["spatial"] * BEAT
+    stop = SCENES["local"] * BEAT
+    t0 = start + ORBIT_START
+    mover = np.zeros(len(pads))
+
+    def add(sound, at):
+        i = int(at * SR)
+        n = min(len(sound), len(mover) - i)
+        mover[i:i + n] += sound[:n]
+
+    add(piano(91, 0.5, 4.0) * 1.2, t0)  # a clear note as the orbit begins
+    pick = [3, 4, 2, 3, 4, 1]
+    k = 0
+    b = np.ceil((t0 / BEAT + 0.5) * 2) / 2
+    while b * BEAT < stop - 1.0:
+        chord = chord_at(int(b))
+        add(piano(chord[pick[k % len(pick)]] + 36, 0.45, 2.5), b * BEAT)
+        k += 1
+        b += 0.5
+    half_turn = ORBIT_PERIOD / 2
+    w = t0 + half_turn  # a breath of air, centred each time the sound passes behind or in front
+    while w + 0.7 < stop:
+        add(whoosh(1.4), w - 0.7)
+        w += half_turn
+    edge = np.ones(len(mover))
+    a, z = int(start * SR), int(stop * SR)
+    edge[:a] = 0
+    edge[z:] = 0
+    ramp = int(0.6 * SR)
+    edge[z - ramp:z] = np.linspace(1, 0, ramp)
+    moving = spatialize(mover * edge, t0)
+    keys = keys + moving * MOVER_GAIN
 
     # Space around everything.
     ir = reverb_ir()
