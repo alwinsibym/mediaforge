@@ -10,7 +10,7 @@ p{font-size:42px;font-weight:400;color:#9aa5c8;margin-top:44px;letter-spacing:-.
 const q=new URLSearchParams(location.search);let i=0;
 const t=document.getElementById("t");
 (q.get("t")||"").split("|").forEach((line,n)=>{if(n)t.append(document.createElement("br"));
-  line.split(" ").forEach(word=>{const s=document.createElement("span");s.className="w";s.style.setProperty("--i",i++);s.textContent=word;t.append(s)})});
+  line.split(" ").forEach(word=>{const s=document.createElement("span");s.className="w"+(word[0]==="~"?" it":"");s.style.setProperty("--i",i++);s.textContent=word.replace(/^~/,"");t.append(s)})});
 document.getElementById("s").textContent=q.get("s")||"";
 if(q.get("sz"))document.documentElement.style.setProperty("--sz",q.get("sz")+"px");
 </script>

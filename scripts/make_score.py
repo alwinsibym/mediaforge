@@ -3,7 +3,7 @@
     python scripts/make_score.py [output.wav]
 
 It is made entirely from sine and noise sources in numpy, so there is nothing to license.
-96 beats per minute, 106 beats (about 66 seconds), in C major: a warm pad, a soft sub bass, glassy
+96 beats per minute, 110 beats (about 69 seconds), in C major: a warm pad, a soft sub bass, glassy
 bell notes with a ping-pong echo, and a quiet heartbeat kick with a light rim and hat. The beat
 numbers of the video's scenes are in SCENES below, so the picture and the music change together.
 """
@@ -18,20 +18,20 @@ from scipy.io import wavfile
 SR = 44100
 BPM = 96
 BEAT = 60 / BPM
-TOTAL_BEATS = 106
-LENGTH = TOTAL_BEATS * BEAT  # 66.25 s
+TOTAL_BEATS = 110
+LENGTH = TOTAL_BEATS * BEAT  # 68.75 s
 
 # Scene start beats, shared with scripts/make_promo.py.
-SCENES = {"intro": 0, "what": 8, "pipe": 16, "demo": 28, "tweaks": 44, "spatial": 56,
-          "local": 68, "phone": 76, "get": 86, "end": 94}
+SCENES = {"intro": 0, "what": 8, "pipe": 16, "demo": 28, "tweaks": 48, "spatial": 60,
+          "local": 72, "phone": 80, "get": 90, "end": 98}
 
 C9 = [48, 55, 59, 62, 64]
 AM9 = [45, 52, 55, 59, 60]
 F9 = [41, 48, 52, 57, 60]
 G69 = [43, 50, 52, 57, 59]
 CHORDS = [(0, C9), (8, AM9), (16, F9), (24, G69), (32, C9), (40, AM9), (48, F9), (56, G69),
-          (64, C9), (72, AM9), (80, F9), (88, G69), (94, C9)]
-FINAL = 94  # the closing chord and the last flourish
+          (64, C9), (72, AM9), (80, F9), (88, G69), (98, C9)]
+FINAL = 98  # the closing chord and the last flourish
 
 rng = np.random.default_rng(7)
 
@@ -147,9 +147,9 @@ def arpeggio_notes(chord, b):
     """Which bell notes play in beat `b`, as (offset in beats, midi, velocity)."""
     top = [chord[2] + 24, chord[3] + 24, chord[4] + 24, chord[1] + 24, chord[3] + 12]
     notes = []
-    if b < 4 or b >= 90:  # the riser and the closing chord are left clear
+    if b < 4 or b >= 94:  # the riser and the closing chord are left clear
         return notes
-    dense = 16 <= b < 68 or 76 <= b < 90
+    dense = 16 <= b < 72 or 80 <= b < 94
     sparse = not dense
     for half in (0, 1):
         n = (b * 2 + half)
@@ -192,8 +192,8 @@ def compose():
     bells = echo(bells, BEAT * 0.75, 0.38, 0.55)
 
     # The beat: quiet and soft, building a little, easing off, and dropping away at the end.
-    for b in range(8, 90):
-        full = 16 <= b < 68 or 76 <= b < 90
+    for b in range(8, 94):
+        full = 16 <= b < 72 or 80 <= b < 94
         if not full:
             if b % 2 == 0:
                 put(drums, kick(0.7), b * BEAT)
@@ -207,7 +207,7 @@ def compose():
             if b % 2 == 1:
                 put(drums, hat(0.5), b * BEAT, pan=0.15)
     put(drums, kick(1.15), FINAL * BEAT)
-    put(drums, riser(4 * BEAT), 90 * BEAT)
+    put(drums, riser(4 * BEAT), 94 * BEAT)
 
     # Space around the pad and the bells.
     ir = reverb_ir()

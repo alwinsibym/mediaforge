@@ -132,3 +132,6 @@ def test_media_links_carry_the_hash_of_the_current_file():
 def test_the_video_frame_does_not_force_a_height():
     css = (SITE / "style.css").read_text(encoding="utf-8")
     assert re.search(r"\.window video \{[^}]*height: auto", css)
+    html = (SITE / "index.html").read_text(encoding="utf-8")
+    # The frame is the video and nothing else, so its height is the video's height.
+    assert "window-bar" not in html

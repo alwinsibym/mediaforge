@@ -29,3 +29,6 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#05070f;color:#f
 /* Every scene leaves the same way: it softens and lifts away just before the cut. */
 body.out .w,body.out .fade,body.out .item,body.out .f{animation:exit .55s cubic-bezier(.4,0,1,1) both!important}
 @keyframes exit{from{opacity:1;filter:none;transform:none}to{opacity:0;filter:blur(10px);transform:translateY(-16px) scale(.985)}}
+
+/* Italic serif lead-ins beside bold sans: the pairing used across the explainer. */
+.it{font-family:"Bitstream Charter",Charter,"Iowan Old Style",Georgia,serif;font-style:italic;font-weight:400;font-stretch:100%;letter-spacing:-.02em;color:#c7cffb}

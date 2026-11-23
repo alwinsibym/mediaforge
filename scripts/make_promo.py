@@ -34,7 +34,7 @@ STAGE_BG = "05070f"
 
 # Their lengths come from the beat numbers in make_score.py.
 CARDS = {
-    "what": ("Meet MediaForge.", "A free converter for audio and video, on your own computer."),
+    "what": ("~Meet MediaForge.", "A free converter for audio and video, on your own computer."),
 }
 
 
@@ -184,7 +184,7 @@ def slow_download(url, fmt, quality, workdir, extra=None, notes=None, mute=False
     for percent in range(0, 101, 5):
         if progress:
             progress({"phase": "downloading", "percent": float(percent), "speed": 3.1e6, "eta": 2})
-        time.sleep(0.1)
+        time.sleep(0.06)
     out = Path(workdir) / f"Sample Song (Official Video).{fmt}"
     out.write_bytes(b"x" * 2048)
     return out
@@ -260,22 +260,22 @@ async def make_scenes(base):
         await asyncio.sleep(1.0)
         film = Film(page, "demo", seconds("demo"))
         await film.start()
-        await film.at(0.9)
+        await film.at(1.5)
         await click(page, app.locator("#url-input"))
-        await page.keyboard.type(URL, delay=24)
+        await page.keyboard.type(URL, delay=22)
         film.log("typed")
-        await film.at(2.8)
+        await film.at(3.2)
         await click(page, app.locator("#preview-btn"))
         await app.locator("#preview:not([hidden])").wait_for()
         film.log("preview shown")
-        await film.at(3.9)
+        await film.at(4.3)
         await app.locator("#format-chips").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
-        await film.at(4.8)
+        await film.at(5.2)
         await click(page, app.locator("#format-chips .chip").nth(3))
         film.log("format chosen")
-        await film.at(5.5)
+        await film.at(5.9)
         await app.locator("#submit-btn").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
-        await film.at(6.3)
+        await film.at(6.6)
         await click(page, app.locator("#submit-btn"), pause=0.1)
         film.log("convert clicked")
         await app.locator("#status.is-success").wait_for(timeout=20000)
