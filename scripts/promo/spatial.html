@@ -1,0 +1,41 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="promo.css">
+<style>
+.stage{position:absolute;left:320px;top:487px;width:700px;height:700px;zoom:.78}
+.ring{position:absolute;left:50%;top:50%;border-radius:50%;border:1.5px solid rgba(138,155,255,.28);transform:translate(-50%,-50%)}
+.r1{width:300px;height:300px}.r2{width:500px;height:500px}.r3{width:680px;height:680px;border-style:dashed;border-color:rgba(138,155,255,.4)}
+.pulse{position:absolute;left:50%;top:50%;width:180px;height:180px;border-radius:50%;border:2px solid #8a9bff;transform:translate(-50%,-50%);opacity:0}
+.go .pulse{animation:pulse 2.8s ease-out 1.2s infinite}.go .pulse.p2{animation-delay:2.1s}
+@keyframes pulse{from{opacity:.6;transform:translate(-50%,-50%) scale(.7)}to{opacity:0;transform:translate(-50%,-50%) scale(3.6)}}
+.head-c{position:absolute;left:50%;top:50%;width:150px;height:150px;transform:translate(-50%,-50%)}
+.orbit{position:absolute;left:50%;top:50%;width:680px;height:680px;margin:-340px 0 0 -340px;opacity:0}
+.go .orbit{animation:fadein .8s ease 1.4s forwards,spin 4.2s linear 1.4s infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.dot{position:absolute;left:50%;top:-4px;width:44px;height:44px;margin-left:-22px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#fff,#a5b4ff 60%,#6366f1);box-shadow:0 0 40px 10px rgba(138,155,255,.6)}
+.tr{position:absolute;left:50%;top:-4px;width:44px;height:44px;margin-left:-22px;border-radius:50%;background:#8a9bff;transform-origin:22px 344px}
+.dir{position:absolute;font-size:30px;font-weight:600;color:#c7cffb;transform:translate(-50%,-50%)}
+.list{position:absolute;left:1130px;top:360px;width:600px}
+.row{display:flex;align-items:center;gap:20px;height:78px;padding:0 28px;border-radius:20px;font-size:34px;font-weight:600;letter-spacing:-.01em;color:#9aa5c8;border:1px solid transparent;margin-bottom:8px}
+.row small{font-size:24px;font-weight:400;margin-left:auto;color:#6f7aa3}
+.row.on{color:#fff;background:rgba(138,155,255,.16);border-color:rgba(138,155,255,.5)}
+@keyframes fadein{to{opacity:1}}
+</style>
+<div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+<div class="head"><h1><span class="w" style="--i:0">Sound</span><span class="w" style="--i:1">that</span><span class="w" style="--i:2">moves</span><span class="w" style="--i:3">around</span><span class="w" style="--i:4">you.</span></h1><p class="fade" style="--d:1s">Spatial placement made for headphones.</p></div>
+<div class="stage item" style="--d:.6s">
+<div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div>
+<div class="pulse"></div><div class="pulse p2"></div>
+<svg class="head-c" viewBox="0 0 100 100"><circle cx="50" cy="52" r="30" fill="#1b2138" stroke="#8a9bff" stroke-width="2.5"/><path d="M50 14l-7 11h14z" fill="#8a9bff"/><rect x="14" y="44" width="8" height="18" rx="4" fill="#8a9bff"/><rect x="78" y="44" width="8" height="18" rx="4" fill="#8a9bff"/></svg>
+<div class="orbit"><div class="dot"></div></div>
+<div class="dir" style="left:50%;top:-34px">Front</div><div class="dir" style="left:50%;top:734px">Behind</div>
+<div class="dir" style="left:-52px;top:50%">Left</div><div class="dir" style="left:752px;top:50%">Right</div>
+</div>
+<div class="list" id="list"></div>
+<script>
+const items=[["Orbit","8D"],["Front",""],["Behind",""],["Left",""],["Right",""],["Above",""],["Room","speakers"],["Movie","5.1 surround"]];
+const list=document.getElementById("list");
+items.forEach(([n,s],i)=>{const r=document.createElement("div");r.className="row item";r.style.setProperty("--d",(1.1+i*.1)+"s");r.innerHTML=n+(s?"<small>"+s+"</small>":"");list.append(r)});
+const rows=[...list.children];let k=0;
+// the highlight steps down the list in time with the beat (0.625 s) once the scene starts
+const start=()=>{rows[0].classList.add("on");setInterval(()=>{rows[k].classList.remove("on");k=(k+1)%rows.length;rows[k].classList.add("on")},1250)};
+new MutationObserver((m,o)=>{if(document.body.classList.contains("go")){o.disconnect();setTimeout(start,1900)}}).observe(document.body,{attributes:true});
+</script>

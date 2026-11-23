@@ -77,7 +77,7 @@ def test_share_image_points_at_a_real_file():
     url = re.search(r'property="og:image" content="([^"]+)"', _html()).group(1)
     canonical = re.search(r'<link rel="canonical" href="([^"]+)"', _html()).group(1)
     assert url.startswith(canonical)
-    assert (SITE / url[len(canonical) :]).is_file()
+    assert (SITE / url[len(canonical) :].split("?")[0]).is_file()
 
 
 def _json_ld():
@@ -113,3 +113,22 @@ def test_page_has_one_h1_and_a_sensible_title_and_description():
 def test_the_download_button_falls_back_to_the_releases_page(page):
     html = (SITE / "index.html").read_text(encoding="utf-8")
     assert 'id="download" href="https://github.com/alwinsibym/mediaforge/releases/latest"' in html
+
+
+def test_media_links_carry_the_hash_of_the_current_file():
+    """Media is cached for a year, so a changed file needs a new address (--stamp-only)."""
+    import hashlib
+
+    html = _html()
+    for name in ("promo.mp4", "poster.jpg", "og.jpg"):
+        digest = hashlib.md5((SITE / "media" / name).read_bytes()).hexdigest()[:8]
+        links = re.findall(rf"media/{re.escape(name)}(\?v=[0-9a-f]+)?", html)
+        assert links, name
+        assert all(link == f"?v={digest}" for link in links), (
+            f"{name} links are stale or unversioned"
+        )
+
+
+def test_the_video_frame_does_not_force_a_height():
+    css = (SITE / "style.css").read_text(encoding="utf-8")
+    assert re.search(r"\.window video \{[^}]*height: auto", css)

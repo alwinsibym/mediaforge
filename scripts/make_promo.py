@@ -32,13 +32,9 @@ BEAT = score.BEAT
 URL = guide.FAKE_URL
 STAGE_BG = "05070f"
 
-# The order of the scenes. Their lengths come from the beat numbers in make_score.py.
-ORDER = ["intro", "c1", "ui1", "c2", "ui2", "c3", "ui3", "c4", "phone", "end"]
+# Their lengths come from the beat numbers in make_score.py.
 CARDS = {
-    "c1": ("Paste a link.", "Any site that yt-dlp supports."),
-    "c2": ("Choose a format.", "Ten of them, from MP3 to MKV."),
-    "c3": ("Hear it differently.", "Spatial sound, made for headphones."),
-    "c4": ("On every screen.", "The same page on a phone, a tablet or a computer."),
+    "what": ("Meet MediaForge.", "A free converter for audio and video, on your own computer."),
 }
 
 
@@ -124,7 +120,10 @@ class Film:
         if delay > 0:
             await asyncio.sleep(delay)
 
-    async def stop(self, fade_in=0.4, fade_out=0.45):
+    async def stop(self, fade_in=0.4, fade_out=0.45, outro=True):
+        if outro:  # the scene's words and pictures lift away just before the cut
+            await self.at(self.length - 0.6)
+            await self.page.evaluate("document.body.classList.add('out')")
         await self.at(self.length)
         await self.cdp.send("Page.stopScreencast")
         await asyncio.sleep(0.2)
@@ -238,59 +237,45 @@ async def make_scenes(base):
     stage = (PROMO / "stage.html").as_uri() + f"?app={base}"
     scenes = []
 
-    async def static(browser, name, path):
+    async def static(browser, name, path, outro=True):
         context, page = await open_page(browser, thumb, path)
         film = Film(page, name, seconds(name))
         await film.start()
-        scenes.append(await film.stop())
+        scenes.append(await film.stop(outro=outro))
         await context.close()
+
+    page_of = lambda name: (PROMO / f"{name}.html").as_uri()  # noqa: E731
 
     async with async_playwright() as p:
         browser = await p.chromium.launch()
 
-        await static(browser, "intro", (PROMO / "intro.html").as_uri())
-        await static(browser, "c1", card_url("c1"))
+        await static(browser, "intro", page_of("intro"), outro=False)
+        await static(browser, "what", card_url("what"))
+        await static(browser, "pipe", page_of("pipe"))
 
-        # Paste a link and preview it.
+        # The real page: paste a link, preview it, pick a format, convert.
         context, page = await open_page(browser, thumb, stage)
         app = page.frame_locator("#f1")
         await app.locator(".chip").first.wait_for()
         await asyncio.sleep(1.0)
-        film = Film(page, "ui1", seconds("ui1"))
+        film = Film(page, "demo", seconds("demo"))
         await film.start()
-        await film.at(1.6)
+        await film.at(0.9)
         await click(page, app.locator("#url-input"))
-        film.log("typing")
-        await page.keyboard.type(URL, delay=26)
+        await page.keyboard.type(URL, delay=24)
         film.log("typed")
-        await film.at(3.3)
+        await film.at(2.8)
         await click(page, app.locator("#preview-btn"))
         await app.locator("#preview:not([hidden])").wait_for()
         film.log("preview shown")
-        await film.at(4.4)
-        await app.locator("#preview").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
-        scenes.append(await film.stop())
-        await context.close()
-
-        await static(browser, "c2", card_url("c2"))
-
-        # Choose a format and convert.
-        context, page = await open_page(browser, thumb, stage)
-        app = page.frame_locator("#f1")
-        await show_for_setup(page)
-        await app.locator(".chip").first.wait_for()
-        await silent_preview(app)
-        await app.locator("#format-chips").evaluate("e => e.scrollIntoView({block:'center'})")
-        await asyncio.sleep(0.6)
-        await hide_after_setup(page)
-        film = Film(page, "ui2", seconds("ui2"))
-        await film.start()
-        await film.at(1.5)
+        await film.at(3.9)
+        await app.locator("#format-chips").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
+        await film.at(4.8)
         await click(page, app.locator("#format-chips .chip").nth(3))
         film.log("format chosen")
-        await film.at(2.4)
+        await film.at(5.5)
         await app.locator("#submit-btn").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
-        await film.at(3.0)
+        await film.at(6.3)
         await click(page, app.locator("#submit-btn"), pause=0.1)
         film.log("convert clicked")
         await app.locator("#status.is-success").wait_for(timeout=20000)
@@ -298,36 +283,9 @@ async def make_scenes(base):
         scenes.append(await film.stop())
         await context.close()
 
-        await static(browser, "c3", card_url("c3"))
-
-        # A file and the spatial sound tweak.
-        context, page = await open_page(browser, thumb, stage)
-        app = page.frame_locator("#f1")
-        await show_for_setup(page)
-        await app.locator(".chip").first.wait_for()
-        await app.locator("#tab-file").click()
-        await app.locator("#file-input").set_input_files(
-            {"name": "Holiday-clip.mp4", "mimeType": "video/mp4", "buffer": b"\x00" * 4096}
-        )
-        await app.locator("#tweaks").wait_for(state="visible")
-        await asyncio.sleep(0.8)
-        await app.locator("#tweaks").evaluate("e => e.scrollIntoView({block:'center'})")
-        await asyncio.sleep(0.5)
-        await hide_after_setup(page)
-        film = Film(page, "ui3", seconds("ui3"))
-        await film.start()
-        await film.at(1.5)
-        await click(page, app.locator("#tweaks > summary"))
-        film.log("tweaks opened")
-        await app.locator("#tw-spatial").evaluate("e => e.scrollIntoView({block:'center', behavior:'smooth'})")
-        await film.at(3.0)
-        await click(page, app.locator("#tw-spatial"), pause=0.1)
-        await app.locator("#tw-spatial").select_option("orbit")
-        film.log("orbit chosen")
-        scenes.append(await film.stop())
-        await context.close()
-
-        await static(browser, "c4", card_url("c4"))
+        await static(browser, "tweaks", page_of("tiles"))
+        await static(browser, "spatial", page_of("spatial"))
+        await static(browser, "local", page_of("local"))
 
         # Desktop, tablet and phone, side by side.
         context, page = await open_page(browser, thumb, stage + "&mode=devices")
@@ -346,7 +304,7 @@ async def make_scenes(base):
         await hide_after_setup(page)
         film = Film(page, "phone", seconds("phone"))
         await film.start()
-        await film.at(1.8)
+        await film.at(1.6)
         await click(page, phone.locator("#url-input"))
         await page.keyboard.type(URL, delay=12)
         film.log("typed")
@@ -356,7 +314,8 @@ async def make_scenes(base):
         scenes.append(await film.stop())
         await context.close()
 
-        await static(browser, "end", (PROMO / "end.html").as_uri())
+        await static(browser, "get", page_of("get"))
+        await static(browser, "end", page_of("end"), outro=False)
         await browser.close()
     return scenes
 
@@ -398,9 +357,31 @@ def join(scenes):
     )
 
 
+def stamp():
+    """Put each media file's content hash into the page's links (media/promo.mp4?v=abcd1234).
+
+    The server tells browsers to keep media files for a year, so a changed file needs a new
+    address, or visitors keep seeing the old one. Run again whenever a media file changes.
+    """
+    import hashlib
+    import re
+
+    page = ROOT / "site" / "index.html"
+    html = page.read_text(encoding="utf-8")
+    for name in ("promo.mp4", "poster.jpg", "og.jpg"):
+        digest = hashlib.md5((OUT / name).read_bytes()).hexdigest()[:8]
+        html = re.sub(rf"media/{re.escape(name)}(\?v=[0-9a-f]+)?", f"media/{name}?v={digest}", html)
+    page.write_text(html, encoding="utf-8")
+    print("stamped media links in site/index.html")
+
+
 if __name__ == "__main__":
+    if "--stamp-only" in sys.argv:
+        stamp()
+        sys.exit(0)
     port = guide.start_server()
     downloader.download_and_convert = slow_download
     scenes = asyncio.run(make_scenes(f"http://127.0.0.1:{port}"))
     join(scenes)
+    stamp()
     print("wrote", (OUT / "promo.mp4").relative_to(ROOT))

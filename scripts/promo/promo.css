@@ -15,3 +15,17 @@ html,body{width:1920px;height:1080px;overflow:hidden;background:#05070f;color:#f
 .go .fade{animation:fadein 1.3s cubic-bezier(.16,1,.3,1) var(--d,.9s) both}
 @keyframes fadein{to{opacity:1;transform:none}}
 .grad{background:linear-gradient(180deg,#ffffff 30%,#aeb9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* Shared pieces for the explainer scenes */
+.item{opacity:0;transform:translateY(26px) scale(.97)}
+.go .item{animation:itemin 1.1s cubic-bezier(.16,1,.3,1) var(--d,0s) both}
+@keyframes itemin{to{opacity:1;transform:none}}
+.glass{background:rgba(21,26,45,.62);border:1px solid rgba(255,255,255,.1);border-radius:30px;box-shadow:0 40px 80px -40px rgba(0,0,0,.8),inset 0 1px 0 rgba(255,255,255,.05)}
+.head{position:absolute;left:0;right:0;top:92px;text-align:center}
+.head h1{font-size:104px;line-height:1.05;font-weight:700;font-stretch:104%;letter-spacing:-.038em}
+.head h1 .w{margin:0 .12em}
+.head p{font-size:36px;color:#9aa5c8;margin-top:22px;letter-spacing:-.005em}
+.muted{color:#9aa5c8}
+/* Every scene leaves the same way: it softens and lifts away just before the cut. */
+body.out .w,body.out .fade,body.out .item,body.out .f{animation:exit .55s cubic-bezier(.4,0,1,1) both!important}
+@keyframes exit{from{opacity:1;filter:none;transform:none}to{opacity:0;filter:blur(10px);transform:translateY(-16px) scale(.985)}}
