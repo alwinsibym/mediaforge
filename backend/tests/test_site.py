@@ -135,3 +135,10 @@ def test_the_video_frame_does_not_force_a_height():
     html = (SITE / "index.html").read_text(encoding="utf-8")
     # The frame is the video and nothing else, so its height is the video's height.
     assert "window-bar" not in html
+
+
+def test_the_page_scrollbar_is_hidden_but_the_page_still_scrolls():
+    css = (SITE / "style.css").read_text(encoding="utf-8")
+    assert "scrollbar-width: none" in css
+    assert "html::-webkit-scrollbar" in css
+    assert not re.search(r"html[^{]*\{[^}]*overflow(-y)?:\s*hidden", css)

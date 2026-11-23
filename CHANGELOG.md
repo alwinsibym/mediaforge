@@ -6,6 +6,7 @@ All notable changes to MediaForge are listed here. The format follows
 
 ## [Unreleased]
 
+- The site hides the page scrollbar for a cleaner look. Scrolling by wheel, touch, keyboard and links works as before.
 - The video has a new score: a soft felt piano over a warm pad, with no drums, in place of the bells and beat.
 - In the spatial sound scene, a few notes and breaths of air travel around the listener in step with the dot on screen.
 - The promo video is now an explainer: what MediaForge is, how it works, a live conversion, the tweaks, spatial sound, privacy, every screen size, and how to get it. It is 69 seconds long. The tweaks appear in an Apple-style grid of tiles, and headlines pair an italic serif with bold sans. There is a new opening and closing, and matching music.

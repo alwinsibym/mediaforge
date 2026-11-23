@@ -52,7 +52,8 @@
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+html { scroll-behavior: smooth; scroll-padding-top: 84px; scrollbar-width: none; }
+html::-webkit-scrollbar { display: none; } /* the page still scrolls; only the bar is hidden */
 body {
   margin: 0;
   background: var(--page);
