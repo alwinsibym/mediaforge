@@ -1,6 +1,6 @@
 """MediaForge backend package."""
 
-__version__ = "1.5.1"
+__version__ = "1.5.2"
 
 from . import paths as _paths  # noqa: E402
 
