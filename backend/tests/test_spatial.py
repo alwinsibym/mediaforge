@@ -79,9 +79,9 @@ def test_missing_sofa_file_blocks_positions(monkeypatch):
 
 
 def test_windows_paths_are_escaped(monkeypatch):
-    monkeypatch.setattr(spatial, "SOFA_FILE", Path("C:/Users/alwin/mediaforge/hrtf.sofa"))
+    monkeypatch.setattr(spatial, "SOFA_FILE", Path("C:/Users/someone/mediaforge/hrtf.sofa"))
     # Path.is_file is not called by _filter_path when no copy is needed
-    assert spatial._filter_path() == "'C\\:/Users/alwin/mediaforge/hrtf.sofa'"
+    assert spatial._filter_path() == "'C\\:/Users/someone/mediaforge/hrtf.sofa'"
 
 
 def test_parse_accepts_and_checks():
