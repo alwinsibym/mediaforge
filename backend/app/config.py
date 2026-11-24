@@ -49,5 +49,13 @@ MAX_ACTIVE_JOBS = int(os.getenv("MEDIAFORGE_MAX_ACTIVE_JOBS", "5"))
 # Set to 1 to allow links to addresses inside your own network (127.0.0.1, 192.168.x.x ...).
 ALLOW_PRIVATE_URLS = os.getenv("MEDIAFORGE_ALLOW_PRIVATE") == "1"
 
+# Extra host names the server answers to, besides localhost, this computer's own name and plain
+# IP addresses. Set it when you put MediaForge behind a domain name, for example
+# MEDIAFORGE_ALLOWED_HOSTS=media.example.com. A web page cannot then trick your browser into
+# talking to MediaForge through a name it controls (a "DNS rebinding" attack).
+ALLOWED_HOSTS = [
+    h.strip().lower() for h in os.getenv("MEDIAFORGE_ALLOWED_HOSTS", "").split(",") if h.strip()
+]
+
 # An access token. When set, every device except this computer must enter it first.
 ACCESS_TOKEN = os.getenv("MEDIAFORGE_TOKEN", "")
