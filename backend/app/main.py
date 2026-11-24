@@ -2,9 +2,11 @@
 
 import hmac
 import importlib.metadata
+import ipaddress
 import json
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -133,6 +135,44 @@ async def _require_token(request: Request, call_next):
             status_code=401,
         )
     return await call_next(request)
+
+
+def _host_allowed(header: str) -> bool:
+    """True for the names MediaForge is meant to be reached by. Browsers always send the name
+    they used, so a foreign name means a web page is steering the browser here."""
+    host = header.strip().lower()
+    if host.startswith("["):  # [::1]:8000
+        name = host[1:].split("]")[0]
+    else:
+        name = host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+    if not name:
+        return False
+    if "*" in config.ALLOWED_HOSTS or name in config.ALLOWED_HOSTS:
+        return True
+    try:
+        ipaddress.ip_address(name)
+        return True  # addresses such as 127.0.0.1 or a phone's 192.168.x.x link cannot be rebound
+    except ValueError:
+        pass
+    return (
+        name == "localhost"
+        or name.endswith((".localhost", ".local"))
+        or name == socket.gethostname().lower()
+    )
+
+
+@app.middleware("http")
+async def _guard_host_and_headers(request: Request, call_next):
+    if not _host_allowed(request.headers.get("host", "")):
+        return JSONResponse(
+            {"detail": "This address is not allowed. Open MediaForge at http://localhost:8000."},
+            status_code=400,
+        )
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 @app.post("/api/login")

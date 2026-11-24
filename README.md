@@ -280,6 +280,7 @@ Set these environment variables before starting the server (or in `docker-compos
 | `MEDIAFORGE_MAX_ACTIVE_JOBS` | `5` | Jobs allowed to wait or run at once; more are refused |
 | `MEDIAFORGE_ALLOW_PRIVATE` | (off) | Set to `1` to allow links to `127.0.0.1`, `192.168.x.x` and other private addresses (blocked by default) |
 | `MEDIAFORGE_TOKEN` | (none) | An access token. Devices other than this computer must enter it once. Use it whenever you start with `--lan` |
+| `MEDIAFORGE_ALLOWED_HOSTS` | (none) | Extra host names MediaForge answers to, comma separated, for example `media.example.com`. `localhost`, this computer's name and plain IP addresses always work. Needed only when you put it behind a domain name |
 
 ## Development
 

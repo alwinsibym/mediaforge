@@ -104,3 +104,29 @@ class TestToken:
         monkeypatch.setattr(config, "ACCESS_TOKEN", "")
         remote = TestClient(app, client=("203.0.113.5", 50000))
         assert remote.get("/api/formats").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "host", ["localhost:8000", "127.0.0.1:8000", "[::1]:8000", "192.168.1.20:8000", "mypc.local"]
+)
+def test_the_names_a_person_really_uses_are_allowed(client, host):
+    assert client.get("/api/health", headers={"Host": host}).status_code == 200
+
+
+@pytest.mark.parametrize(
+    "host", ["evil.example.com", "evil.example.com:8000", "localhost.evil.com", ""]
+)
+def test_a_foreign_host_name_is_refused(client, host):
+    """A web page that points its own domain at 127.0.0.1 must not reach the app."""
+    assert client.get("/api/settings", headers={"Host": host}).status_code == 400
+
+
+def test_a_host_listed_in_the_settings_is_allowed(client, monkeypatch):
+    monkeypatch.setattr(config, "ALLOWED_HOSTS", ["media.example.com", "testserver"])
+    assert client.get("/api/health", headers={"Host": "media.example.com"}).status_code == 200
+
+
+def test_pages_cannot_be_framed_and_are_not_sniffed(client):
+    response = client.get("/")
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["x-content-type-options"] == "nosniff"

@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from app import config, jobs
 from app.main import app
 
+config.ALLOWED_HOSTS.append("testserver")  # the name Starlette's test client sends
+
 requires_ffmpeg = pytest.mark.skipif(
     shutil.which("ffmpeg") is None, reason="FFmpeg is not installed"
 )
