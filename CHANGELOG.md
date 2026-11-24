@@ -11,6 +11,10 @@ All notable changes to MediaForge are listed here. The format follows
 - MediaForge now checks the host name of every request. A web page that points its own domain at your computer (a "DNS rebinding" attack) can no longer talk to the local app. `localhost`, this computer's name and IP addresses work as before; use `MEDIAFORGE_ALLOWED_HOSTS` for a domain name.
 - Every page and reply now carries `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`, so another site cannot put the app in a frame.
 
+### Changed
+
+- Housekeeping: a stray coverage file is no longer tracked and is now ignored, and the tests use a neutral example path instead of a real user name.
+
 ## [1.5.2] - 2026-11-24
 
 ### Fixed
